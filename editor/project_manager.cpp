@@ -64,6 +64,7 @@
 #include "servers/display_server.h"
 #include "servers/navigation_server_3d.h"
 #include "servers/physics_server_2d.h"
+#include "filesystem"
 
 constexpr int GODOT4_CONFIG_VERSION = 5;
 
@@ -481,49 +482,12 @@ void ProjectDialog::ok_pressed() {
 					cd->grab_focus();
 					return;
 				}
-				PackedStringArray project_features = ProjectSettings::get_required_features();
-				ProjectSettings::CustomMap initial_settings;
 
-				// Be sure to change this code if/when renderers are changed.
-				// Default values are "forward_plus" for the main setting, "mobile" for the mobile override,
-				// and "gl_compatibility" for the web override.
-				String renderer_type = renderer_button_group->get_pressed_button()->get_meta(SNAME("rendering_method"));
-				initial_settings["rendering/renderer/rendering_method"] = renderer_type;
+				String defaultPath = OS::get_singleton()->get_executable_path().get_base_dir() + "/default_project";
 
-				EditorSettings::get_singleton()->set("project_manager/default_renderer", renderer_type);
-				EditorSettings::get_singleton()->save();
+				std::filesystem::copy(defaultPath.utf8().get_data(), dir.utf8().get_data(), std::filesystem::copy_options::recursive);
 
-				if (renderer_type == "forward_plus") {
-					project_features.push_back("Forward Plus");
-				} else if (renderer_type == "mobile") {
-					project_features.push_back("Mobile");
-				} else if (renderer_type == "gl_compatibility") {
-					project_features.push_back("GL Compatibility");
-					// Also change the default rendering method for the mobile override.
-					initial_settings["rendering/renderer/rendering_method.mobile"] = "gl_compatibility";
-				} else {
-					WARN_PRINT("Unknown renderer type. Please report this as a bug on GitHub.");
-				}
 
-				project_features.sort();
-				initial_settings["application/config/features"] = project_features;
-				initial_settings["application/config/name"] = project_name->get_text().strip_edges();
-				initial_settings["application/config/icon"] = "res://icon.svg";
-
-				if (ProjectSettings::get_singleton()->save_custom(dir.path_join("project.godot"), initial_settings, Vector<String>(), false) != OK) {
-					_set_message(TTR("Couldn't create project.godot in project path."), MESSAGE_ERROR);
-				} else {
-					// Store default project icon in SVG format.
-					Error err;
-					Ref<FileAccess> fa_icon = FileAccess::open(dir.path_join("icon.svg"), FileAccess::WRITE, &err);
-					fa_icon->store_string(get_default_project_icon());
-
-					if (err != OK) {
-						_set_message(TTR("Couldn't create icon.svg in project path."), MESSAGE_ERROR);
-					}
-
-					EditorVCSInterface::create_vcs_metadata_files(EditorVCSInterface::VCSMetadata(vcs_metadata_selection->get_selected()), dir);
-				}
 			} else if (mode == MODE_INSTALL) {
 				if (project_path->get_text().ends_with(".zip")) {
 					dir = install_path->get_text();
@@ -752,7 +716,7 @@ void ProjectDialog::show_dialog() {
 			set_ok_button_text(TTR("Create & Edit"));
 			name_container->show();
 			install_path_container->hide();
-			renderer_container->show();
+			renderer_container->hide();
 			default_files_container->show();
 			project_name->call_deferred(SNAME("grab_focus"));
 			project_name->call_deferred(SNAME("select_all"));
@@ -2882,7 +2846,7 @@ ProjectManager::ProjectManager() {
 	tabs->connect("tab_changed", callable_mp(this, &ProjectManager::_on_tab_changed));
 
 	local_projects_vb = memnew(VBoxContainer);
-	local_projects_vb->set_name(TTR("Local Projects"));
+	local_projects_vb->set_name(TTR("Projects"));
 	tabs->add_child(local_projects_vb);
 
 	{
@@ -3006,10 +2970,10 @@ ProjectManager::ProjectManager() {
 
 		tree_vb->add_spacer();
 
-		about_btn = memnew(Button);
-		about_btn->set_text(TTR("About"));
-		about_btn->connect("pressed", callable_mp(this, &ProjectManager::_show_about));
-		tree_vb->add_child(about_btn);
+		//about_btn = memnew(Button);
+		//about_btn->set_text(TTR("About"));
+		//about_btn->connect("pressed", callable_mp(this, &ProjectManager::_show_about));
+		//tree_vb->add_child(about_btn);
 	}
 
 	{
@@ -3083,7 +3047,7 @@ ProjectManager::ProjectManager() {
 		center_box->add_child(settings_hb);
 	}
 
-	if (AssetLibraryEditorPlugin::is_available()) {
+	if (false) {
 		asset_library = memnew(EditorAssetLibrary(true));
 		asset_library->set_name(TTR("Asset Library Projects"));
 		tabs->add_child(asset_library);
