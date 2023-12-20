@@ -48,12 +48,12 @@
 #include "modules/svg/image_loader_svg.h"
 #endif
 
-static const int default_font_size = 16;
+static const int default_font_size = 12;
 
 static float scale = 1.0;
 
 static const int default_margin = 4;
-static const int default_corner_radius = 3;
+static const int default_corner_radius = 2;
 
 static Ref<StyleBoxFlat> make_flat_stylebox(Color p_color, float p_margin_left = default_margin, float p_margin_top = default_margin, float p_margin_right = default_margin, float p_margin_bottom = default_margin, int p_corner_radius = default_corner_radius, bool p_draw_center = true, int p_border_width = 0) {
 	Ref<StyleBoxFlat> style(memnew(StyleBoxFlat));
