@@ -1,9 +1,10 @@
-short_name = "godot"
-name = "Godot Engine"
+short_name = "OIP"
+name = "Open Industry Project"
 major = 4
 minor = 5
 patch = 0
 status = "dev"
 module_config = ""
-website = "https://godotengine.org"
+year = 2025
+website = "https://github.com/Automation-Standard/Open-Industry-Project"
 docs = "latest"
