@@ -4368,8 +4368,8 @@ bool Node3DEditorViewport::_create_instance(Node *parent, String &path, const Po
 			gl_transform = parent_node3d->get_global_gizmo_transform();
 		}
 
-		gl_transform.origin = preview_node_pos;
-		gl_transform.basis *= node3d->get_transform().basis;
+		gl_transform.origin = preview_node_pos + node3d->get_position();
+		gl_transform.basis *= parent_node3d->get_transform().basis.inverse() * node3d->get_transform().basis;
 
 		undo_redo->add_do_method(instantiated_scene, "set_global_transform", gl_transform);
 	}
