@@ -4100,6 +4100,9 @@ AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, boo
 		Node3D *child = Object::cast_to<Node3D>(p_parent->get_child(i));
 		if (child) {
 			AABB child_bounds = _calculate_spatial_bounds(child, false);
+			if (child->is_set_as_top_level()) {
+				child_bounds = p_parent->get_global_transform().xform_inv(child_bounds);
+			}
 
 			if (bounds.size == Vector3() && p_parent) {
 				bounds = child_bounds;
