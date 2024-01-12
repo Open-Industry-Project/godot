@@ -2789,8 +2789,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 				}
 
 				Transform3D t = sp->get_global_gizmo_transform();
-				VisualInstance3D *vi = Object::cast_to<VisualInstance3D>(sp);
-				AABB new_aabb = vi ? vi->get_aabb() : _calculate_spatial_bounds(sp);
+				AABB new_aabb = _calculate_spatial_bounds(sp);
 
 				exist = true;
 				if (se->last_xform == t && se->aabb == new_aabb && !se->last_xform_dirty) {
