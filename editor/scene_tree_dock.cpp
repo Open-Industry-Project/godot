@@ -154,6 +154,8 @@ void SceneTreeDock::shortcut_input(const Ref<InputEvent> &p_event) {
 		_tool_selected(TOOL_TOGGLE_SCENE_UNIQUE_NAME);
 	} else if (ED_IS_SHORTCUT("scene_tree/delete", p_event)) {
 		_tool_selected(TOOL_ERASE);
+	} else if (ED_IS_SHORTCUT("scene_tree/unselect_all", p_event)) {
+		_tool_selected(TOOL_UNSELECT_ALL);
 	} else {
 		return;
 	}
@@ -1315,7 +1317,9 @@ void SceneTreeDock::_tool_selected(int p_tool, bool p_confirm_override) {
 
 			scene_tree->get_scene_tree()->grab_focus();
 		} break;
-
+		case TOOL_UNSELECT_ALL: {
+			editor_selection->clear();
+		} break;
 		default: {
 			_filter_option_selected(p_tool);
 
@@ -4123,6 +4127,7 @@ SceneTreeDock::SceneTreeDock(Node *p_scene_root, EditorSelection *p_editor_selec
 	ED_SHORTCUT("scene_tree/toggle_unique_name", TTR("Toggle Access as Unique Name"));
 	ED_SHORTCUT("scene_tree/delete_no_confirm", TTR("Delete (No Confirm)"), KeyModifierMask::SHIFT | Key::KEY_DELETE);
 	ED_SHORTCUT("scene_tree/delete", TTR("Delete"), Key::KEY_DELETE);
+	ED_SHORTCUT("scene_tree/unselect_all", TTR("Unselect All"), Key::ESCAPE);
 
 	button_add = memnew(Button);
 	button_add->set_flat(true);
