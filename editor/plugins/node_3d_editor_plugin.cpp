@@ -7385,19 +7385,25 @@ void Node3DEditor::_update_gizmos_menu() {
 		const int plugin_state = gizmo_plugins_by_name[i]->get_state();
 		gizmos_menu->add_multistate_item(plugin_name, 3, plugin_state, i);
 		const int idx = gizmos_menu->get_item_index(i);
-		gizmos_menu->set_item_tooltip(
-				idx,
-				TTR("Click to toggle between visibility states.\n\nOpen eye: Gizmo is visible.\nClosed eye: Gizmo is hidden.\nHalf-open eye: Gizmo is also visible through opaque surfaces (\"x-ray\")."));
-		switch (plugin_state) {
-			case EditorNode3DGizmoPlugin::VISIBLE:
-				gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_visible")));
-				break;
-			case EditorNode3DGizmoPlugin::ON_TOP:
-				gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_xray")));
-				break;
-			case EditorNode3DGizmoPlugin::HIDDEN:
-				gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_hidden")));
-				break;
+		if (gizmos_menu->get_item_text(idx) == "CollisionShape3D" || gizmos_menu->get_item_text(idx) == "Light3D") {
+			gizmos_menu->toggle_item_multistate(idx);
+			gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_hidden")));
+			gizmo_plugins_by_name.write[i]->set_state(1);
+		} else {
+			gizmos_menu->set_item_tooltip(
+					idx,
+					TTR("Click to toggle between visibility states.\n\nOpen eye: Gizmo is visible.\nClosed eye: Gizmo is hidden.\nHalf-open eye: Gizmo is also visible through opaque surfaces (\"x-ray\")."));
+			switch (plugin_state) {
+				case EditorNode3DGizmoPlugin::VISIBLE:
+					gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_visible")));
+					break;
+				case EditorNode3DGizmoPlugin::ON_TOP:
+					gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_xray")));
+					break;
+				case EditorNode3DGizmoPlugin::HIDDEN:
+					gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_hidden")));
+					break;
+			}
 		}
 	}
 }
