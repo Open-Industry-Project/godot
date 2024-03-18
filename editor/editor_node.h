@@ -471,6 +471,8 @@ private:
 	String open_navigate;
 	String saving_scene;
 
+	bool simulation_started = false;
+
 	DynamicFontImportSettingsDialog *fontdata_import_settings = nullptr;
 	SceneImportSettingsDialog *scene_import_settings = nullptr;
 	AudioStreamImportSettingsDialog *audio_stream_import_settings = nullptr;
@@ -741,6 +743,8 @@ public:
 	EditorSelectionHistory *get_editor_selection_history() { return &editor_history; }
 
 	ProjectSettingsEditor *get_project_settings() { return project_settings_editor; }
+
+	void set_simulation_started(bool p_started) { simulation_started = p_started; }
 
 	void trigger_menu_option(int p_option, bool p_confirmed);
 	bool has_previous_scenes() const;
