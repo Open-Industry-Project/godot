@@ -119,6 +119,8 @@ public:
 	SubViewport *get_editor_viewport_2d() const;
 	SubViewport *get_editor_viewport_3d(int p_idx = 0) const;
 
+	void set_simulation_started(bool p_started);
+
 	void set_main_screen_editor(const String &p_name);
 	void set_distraction_free_mode(bool p_enter);
 	bool is_distraction_free_mode_enabled() const;

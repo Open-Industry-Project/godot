@@ -1667,6 +1667,11 @@ void EditorNode::_find_node_types(Node *p_node, int &count_2d, int &count_3d) {
 }
 
 void EditorNode::_save_scene_with_preview(String p_file, int p_idx) {
+	if (simulation_started) {
+		show_accept(TTR("Scene can't be saved while the simulation is started."), TTR("OK"));
+		return;
+	}
+
 	save_scene_progress = memnew(EditorProgress("save", TTR("Saving Scene"), 4));
 
 	if (editor_data.get_edited_scene_root() != nullptr) {
