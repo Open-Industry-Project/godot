@@ -4126,18 +4126,21 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos) const 
 	return world_pos + world_ray * FALLBACK_DISTANCE;
 }
 
-AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, const Node3D *p_top_level_parent) {
+AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, const Transform3D *p_bounds_orientation) {
 	AABB bounds;
 
-	if (!p_top_level_parent) {
-		p_top_level_parent = p_parent;
+	Transform3D bounds_orientation;
+	if (p_bounds_orientation) {
+		bounds_orientation = *p_bounds_orientation;
+	} else {
+		bounds_orientation = p_parent->get_global_transform();
 	}
 
 	if (!p_parent) {
 		return AABB(Vector3(-0.2, -0.2, -0.2), Vector3(0.4, 0.4, 0.4));
 	}
 
-	Transform3D xform_to_top_level_parent_space = p_top_level_parent->get_global_transform().affine_inverse() * p_parent->get_global_transform();
+	const Transform3D xform_to_top_level_parent_space = bounds_orientation.affine_inverse() * p_parent->get_global_transform();
 
 	const VisualInstance3D *visual_instance = Object::cast_to<VisualInstance3D>(p_parent);
 	if (visual_instance) {
@@ -4148,9 +4151,9 @@ AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, con
 	bounds = xform_to_top_level_parent_space.xform(bounds);
 
 	for (int i = 0; i < p_parent->get_child_count(); i++) {
-		Node3D *child = Object::cast_to<Node3D>(p_parent->get_child(i));
+		const Node3D *child = Object::cast_to<Node3D>(p_parent->get_child(i));
 		if (child) {
-			AABB child_bounds = _calculate_spatial_bounds(child, p_top_level_parent);
+			const AABB child_bounds = _calculate_spatial_bounds(child, &bounds_orientation);
 			bounds.merge_with(child_bounds);
 		}
 	}
