@@ -4097,8 +4097,35 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos) const 
 	ray_params.to = world_pos + world_ray * camera->get_far();
 
 	PhysicsDirectSpaceState3D::RayResult result;
-	if (ss->intersect_ray(ray_params, result)) {
-		return result.position;
+	if (ss->intersect_ray(ray_params, result) && preview_node->get_child_count() > 0) {
+		// Calculate an offset for the `preview_node` such that the its bounding box is on top of and touching the contact surface's plane.
+
+		// Use the Gram-Schmidt process to get an orthonormal Basis aligned with the surface normal.
+		const Vector3 bb_basis_x = result.normal;
+		Vector3 bb_basis_y = Vector3(0, 1, 0);
+		bb_basis_y = bb_basis_y - bb_basis_y.project(bb_basis_x);
+		if (bb_basis_y.is_zero_approx()) {
+			bb_basis_y = Vector3(0, 0, 1);
+			bb_basis_y = bb_basis_y - bb_basis_y.project(bb_basis_x);
+		}
+		bb_basis_y = bb_basis_y.normalized();
+		const Vector3 bb_basis_z = bb_basis_x.cross(bb_basis_y);
+		const Basis bb_basis = Basis(bb_basis_x, bb_basis_y, bb_basis_z);
+
+		// This normal-aligned Basis allows us to create an AABB that can fit on the surface plane as snugly as possible.
+		const Transform3D bb_transform = Transform3D(bb_basis, preview_node->get_transform().origin);
+		const AABB preview_node_bb = _calculate_spatial_bounds(preview_node, true, &bb_transform);
+		// Use the local space of the `preview_node_bb` for our distance calculation.
+		const Vector3 surface_normal = Vector3(1, 0, 0);
+		const Vector3 preview_node_origin = Vector3(0, 0, 0);
+		const Vector3 support = preview_node_bb.get_support(-surface_normal);
+		const Plane support_plane = Plane(surface_normal, support);
+		const float offset_distance = support_plane.distance_to(preview_node_origin);
+
+		// `result_offset` is in global space.
+		const Vector3 result_offset = result.position + result.normal * offset_distance;
+
+		return result_offset;
 	}
 
 	const bool is_orthogonal = camera->get_projection() == Camera3D::PROJECTION_ORTHOGONAL;
