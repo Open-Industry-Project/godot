@@ -4115,12 +4115,8 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos) const 
 		// This normal-aligned Basis allows us to create an AABB that can fit on the surface plane as snugly as possible.
 		const Transform3D bb_transform = Transform3D(bb_basis, preview_node->get_transform().origin);
 		const AABB preview_node_bb = _calculate_spatial_bounds(preview_node, true, &bb_transform);
-		// Use the local space of the `preview_node_bb` for our distance calculation.
-		const Vector3 surface_normal = Vector3(1, 0, 0);
-		const Vector3 preview_node_origin = Vector3(0, 0, 0);
-		const Vector3 support = preview_node_bb.get_support(-surface_normal);
-		const Plane support_plane = Plane(surface_normal, support);
-		const float offset_distance = support_plane.distance_to(preview_node_origin);
+		// The x-axis's alignment with the surface normal also makes it trivial to get the distance from `preview_node`'s origin at (0, 0, 0) to the correct AABB face.
+		const float offset_distance = -preview_node_bb.position.x;
 
 		// `result_offset` is in global space.
 		const Vector3 result_offset = result.position + result.normal * offset_distance;
