@@ -4126,7 +4126,7 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos) const 
 	return world_pos + world_ray * FALLBACK_DISTANCE;
 }
 
-AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, const Transform3D *p_bounds_orientation) {
+AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, const bool p_omit_top_level, const Transform3D *p_bounds_orientation) {
 	AABB bounds;
 
 	Transform3D bounds_orientation;
@@ -4152,8 +4152,8 @@ AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, con
 
 	for (int i = 0; i < p_parent->get_child_count(); i++) {
 		const Node3D *child = Object::cast_to<Node3D>(p_parent->get_child(i));
-		if (child) {
-			const AABB child_bounds = _calculate_spatial_bounds(child, &bounds_orientation);
+		if (child && !(p_omit_top_level && child->is_set_as_top_level())) {
+			const AABB child_bounds = _calculate_spatial_bounds(child, p_omit_top_level, &bounds_orientation);
 			bounds.merge_with(child_bounds);
 		}
 	}
