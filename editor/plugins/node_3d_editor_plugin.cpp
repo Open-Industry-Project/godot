@@ -4210,6 +4210,10 @@ void Node3DEditorViewport::_create_preview_node(const Vector<String> &files) con
 					if (instance) {
 						instance = _sanitize_preview_node(instance);
 						preview_node->add_child(instance);
+						Node3D *node_3d = Object::cast_to<Node3D>(instance);
+						if (node_3d) {
+							node_3d->set_as_top_level(false);
+						}
 					}
 				}
 			}
@@ -4412,8 +4416,12 @@ bool Node3DEditorViewport::_create_instance(Node *parent, String &path, const Po
 		}
 
 		Transform3D new_tf = node3d->get_transform();
-		new_tf.origin = parent_tf.affine_inverse().xform(preview_node_pos + node3d->get_position());
-		new_tf.basis = parent_tf.affine_inverse().basis * new_tf.basis;
+		if (node3d->is_set_as_top_level()) {
+			new_tf.origin += preview_node_pos;
+		} else {
+			new_tf.origin = parent_tf.affine_inverse().xform(preview_node_pos + node3d->get_position());
+			new_tf.basis = parent_tf.affine_inverse().basis * new_tf.basis;
+		}
 
 		undo_redo->add_do_method(instantiated_scene, "set_transform", new_tf);
 	}
