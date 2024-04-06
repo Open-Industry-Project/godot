@@ -1969,7 +1969,7 @@ void ProjectManager::_notification(int p_what) {
 			import_btn->set_icon(get_editor_theme_icon(SNAME("Load")));
 			scan_btn->set_icon(get_editor_theme_icon(SNAME("Search")));
 			open_btn->set_icon(get_editor_theme_icon(SNAME("Edit")));
-			run_btn->set_icon(get_editor_theme_icon(SNAME("Play")));
+			//run_btn->set_icon(get_editor_theme_icon(SNAME("Play")));
 			rename_btn->set_icon(get_editor_theme_icon(SNAME("Rename")));
 			manage_tags_btn->set_icon(get_editor_theme_icon("Script"));
 			erase_btn->set_icon(get_editor_theme_icon(SNAME("Remove")));
@@ -1983,7 +1983,7 @@ void ProjectManager::_notification(int p_what) {
 			import_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
 			scan_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
 			open_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
-			run_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
+			//run_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
 			rename_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
 			manage_tags_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
 			erase_btn->add_theme_constant_override("h_separation", get_theme_constant(SNAME("sidebar_button_icon_separation"), SNAME("ProjectManager")));
@@ -2130,7 +2130,7 @@ void ProjectManager::_update_project_buttons() {
 	open_btn->set_disabled(empty_selection || is_missing_project_selected);
 	rename_btn->set_disabled(empty_selection || is_missing_project_selected);
 	manage_tags_btn->set_disabled(empty_selection || is_missing_project_selected || selected_projects.size() > 1);
-	run_btn->set_disabled(empty_selection || is_missing_project_selected);
+	//run_btn->set_disabled(empty_selection || is_missing_project_selected);
 
 	erase_missing_btn->set_disabled(!_project_list->is_any_project_missing());
 }
@@ -2446,7 +2446,7 @@ void ProjectManager::_run_project_confirm() {
 	}
 }
 
-void ProjectManager::_run_project() {
+/* void ProjectManager::_run_project() {
 	const HashSet<String> &selected_list = _project_list->get_selected_project_keys();
 
 	if (selected_list.size() < 1) {
@@ -2459,7 +2459,7 @@ void ProjectManager::_run_project() {
 	} else {
 		_run_project_confirm();
 	}
-}
+}*/
 
 void ProjectManager::_scan_projects() {
 	scan_dir->popup_file_dialog();
@@ -2940,11 +2940,11 @@ ProjectManager::ProjectManager() {
 		open_btn->connect("pressed", callable_mp(this, &ProjectManager::_open_selected_projects_ask));
 		tree_vb->add_child(open_btn);
 
-		run_btn = memnew(Button);
-		run_btn->set_text(TTR("Run"));
-		run_btn->set_shortcut(ED_SHORTCUT("project_manager/run_project", TTR("Run Project"), KeyModifierMask::CMD_OR_CTRL | Key::R));
-		run_btn->connect("pressed", callable_mp(this, &ProjectManager::_run_project));
-		tree_vb->add_child(run_btn);
+		//run_btn = memnew(Button);
+		//run_btn->set_text(TTR("Run"));
+		//run_btn->set_shortcut(ED_SHORTCUT("project_manager/run_project", TTR("Run Project"), KeyModifierMask::CMD_OR_CTRL | Key::R));
+		//run_btn->connect("pressed", callable_mp(this, &ProjectManager::_run_project));
+		//tree_vb->add_child(run_btn);
 
 		rename_btn = memnew(Button);
 		rename_btn->set_text(TTR("Rename"));
