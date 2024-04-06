@@ -7051,7 +7051,7 @@ void Node3DEditor::_update_gizmos_menu() {
 		const int plugin_state = gizmo_plugins_by_name[i]->get_state();
 		gizmos_menu->add_multistate_item(plugin_name, 3, plugin_state, i);
 		const int idx = gizmos_menu->get_item_index(i);
-		if (gizmos_menu->get_item_text(idx) == "CollisionShape3D") {
+		if (gizmos_menu->get_item_text(idx) == "CollisionShape3D" || gizmos_menu->get_item_text(idx) == "Light3D") {
 			gizmos_menu->toggle_item_multistate(idx);
 			gizmos_menu->set_item_icon(idx, gizmos_menu->get_theme_icon(SNAME("visibility_hidden")));
 			gizmo_plugins_by_name.write[i]->set_state(1);
