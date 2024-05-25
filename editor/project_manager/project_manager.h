@@ -157,13 +157,12 @@ class ProjectManager : public Control {
 	Button *scan_btn = nullptr;
 	Button *open_btn = nullptr;
 	Button *open_options_btn = nullptr;
-	Button *run_btn = nullptr;
 	Button *rename_btn = nullptr;
 	Button *duplicate_btn = nullptr;
 	Button *manage_tags_btn = nullptr;
 	Button *erase_btn = nullptr;
 	Button *erase_missing_btn = nullptr;
-	Button *donate_btn = nullptr;
+	Button *quick_settings_button2 = nullptr;
 
 	HBoxContainer *open_btn_container = nullptr;
 	PopupMenu *open_options_popup = nullptr;
@@ -177,14 +176,11 @@ class ProjectManager : public Control {
 	//CheckBox *delete_project_contents = nullptr;
 	ConfirmationDialog *erase_missing_ask = nullptr;
 	ConfirmationDialog *multi_open_ask = nullptr;
-	ConfirmationDialog *multi_run_ask = nullptr;
 	ConfirmationDialog *open_recovery_mode_ask = nullptr;
 
 	ProjectDialog *project_dialog = nullptr;
 
 	void _scan_projects();
-	void _run_project();
-	void _run_project_confirm();
 	void _open_selected_projects();
 	void _open_selected_projects_with_migration();
 	void _open_selected_projects_check_warnings();

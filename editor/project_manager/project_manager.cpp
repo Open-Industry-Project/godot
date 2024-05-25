@@ -269,7 +269,6 @@ void ProjectManager::_update_theme(bool p_skip_creation) {
 			scan_btn->set_button_icon(get_editor_theme_icon("Search"));
 			open_btn->set_button_icon(get_editor_theme_icon("Edit"));
 			open_options_btn->set_button_icon(get_editor_theme_icon("Collapse"));
-			run_btn->set_button_icon(get_editor_theme_icon("Play"));
 			rename_btn->set_button_icon(get_editor_theme_icon("Rename"));
 			duplicate_btn->set_button_icon(get_editor_theme_icon("Duplicate"));
 			manage_tags_btn->set_button_icon(get_editor_theme_icon("Script"));
@@ -285,7 +284,6 @@ void ProjectManager::_update_theme(bool p_skip_creation) {
 			import_btn->add_theme_constant_override("h_separation", h_separation);
 			scan_btn->add_theme_constant_override("h_separation", h_separation);
 			open_btn->add_theme_constant_override("h_separation", h_separation);
-			run_btn->add_theme_constant_override("h_separation", h_separation);
 			rename_btn->add_theme_constant_override("h_separation", h_separation);
 			duplicate_btn->add_theme_constant_override("h_separation", h_separation);
 			manage_tags_btn->add_theme_constant_override("h_separation", h_separation);
@@ -414,10 +412,6 @@ void ProjectManager::_project_list_menu_option(int p_option) {
 			_open_recovery_mode_ask(true);
 			break;
 
-		case ProjectList::MENU_RUN:
-			_run_project_confirm();
-			break;
-
 		case ProjectList::MENU_SHOW_IN_FILE_MANAGER:
 			_show_project_in_file_manager();
 			break;
@@ -503,55 +497,6 @@ void ProjectManager::_update_list_placeholder() {
 
 void ProjectManager::_scan_projects() {
 	scan_dir->popup_file_dialog();
-}
-
-void ProjectManager::_run_project() {
-	const HashSet<String> &selected_list = project_list->get_selected_project_keys();
-
-	if (selected_list.size() < 1) {
-		return;
-	}
-
-	if (selected_list.size() > 1) {
-		multi_run_ask->set_text(vformat(TTR("Are you sure to run %d projects at once?"), selected_list.size()));
-		multi_run_ask->popup_centered();
-	} else {
-		_run_project_confirm();
-	}
-}
-
-void ProjectManager::_run_project_confirm() {
-	Vector<ProjectList::Item> selected_list = project_list->get_selected_projects();
-
-	for (int i = 0; i < selected_list.size(); ++i) {
-		const String &selected_main = selected_list[i].main_scene;
-		if (selected_main.is_empty()) {
-			_show_error(TTRC("Can't run project: Project has no main scene defined.\nPlease edit the project and set the main scene in the Project Settings under the \"Application\" category."));
-			continue;
-		}
-
-		const String &path = selected_list[i].path;
-
-		// `.substr(6)` on `ProjectSettings::get_singleton()->get_imported_files_path()` strips away the leading "res://".
-		if (!DirAccess::exists(path.path_join(ProjectSettings::get_singleton()->get_imported_files_path().substr(6)))) {
-			_show_error(TTRC("Can't run project: Assets need to be imported first.\nPlease edit the project to trigger the initial import."));
-			continue;
-		}
-
-		print_line("Running project: " + path);
-
-		List<String> args;
-
-		for (const String &a : Main::get_forwardable_cli_arguments(Main::CLI_SCOPE_PROJECT)) {
-			args.push_back(a);
-		}
-
-		args.push_back("--path");
-		args.push_back(path);
-
-		Error err = OS::get_singleton()->create_instance(args);
-		ERR_FAIL_COND(err);
-	}
 }
 
 void ProjectManager::_open_selected_projects() {
@@ -860,7 +805,6 @@ void ProjectManager::_update_project_buttons() {
 	rename_btn->set_disabled(empty_selection || is_missing_project_selected);
 	duplicate_btn->set_disabled(empty_selection || is_missing_project_selected);
 	manage_tags_btn->set_disabled(empty_selection || is_missing_project_selected || selected_projects.size() > 1);
-	run_btn->set_disabled(empty_selection || is_missing_project_selected);
 
 	erase_missing_btn->set_disabled(!project_list->is_any_project_missing());
 }
@@ -1422,7 +1366,7 @@ ProjectManager::ProjectManager() {
 
 	{
 		title_bar = memnew(EditorTitleBar);
-		main_vbox->add_child(title_bar);
+		//main_vbox->add_child(title_bar);
 
 		if (can_expand) {
 			// Add spacer to avoid other controls under window minimize/maximize/close buttons (left side).
@@ -1683,12 +1627,6 @@ ProjectManager::ProjectManager() {
 
 			open_btn_container->set_custom_minimum_size(Size2(120, open_btn->get_combined_minimum_size().y));
 
-			run_btn = memnew(Button);
-			run_btn->set_text(TTRC("Run"));
-			run_btn->set_shortcut(ED_SHORTCUT("project_manager/run_project", TTRC("Run Project"), KeyModifierMask::CMD_OR_CTRL | Key::R));
-			run_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_run_project));
-			sidebar_buttons_containter->add_child(run_btn);
-
 			rename_btn = memnew(Button);
 			rename_btn->set_text(TTRC("Rename"));
 			// The F2 shortcut isn't overridden with Enter on macOS as Enter is already used to edit a project.
@@ -1717,10 +1655,11 @@ ProjectManager::ProjectManager() {
 			erase_missing_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_erase_missing_projects));
 			sidebar_buttons_containter->add_child(erase_missing_btn);
 
-			donate_btn = memnew(Button);
-			donate_btn->set_text(TTRC("Donate"));
-			donate_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_open_donate_page));
-			project_list_sidebar->add_child(donate_btn);
+			quick_settings_button2 = memnew(Button);
+			quick_settings_button2->set_text(TTR("Settings"));
+			quick_settings_button2->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_show_quick_settings));
+			project_list_sidebar->add_child(quick_settings_button2);
+
 		}
 	}
 
@@ -1792,11 +1731,6 @@ ProjectManager::ProjectManager() {
 		multi_open_ask->set_ok_button_text(TTRC("Edit"));
 		multi_open_ask->get_ok_button()->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_open_selected_projects));
 		add_child(multi_open_ask);
-
-		multi_run_ask = memnew(ConfirmationDialog);
-		multi_run_ask->set_ok_button_text(TTRC("Run"));
-		multi_run_ask->get_ok_button()->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_run_project_confirm));
-		add_child(multi_run_ask);
 
 		open_recovery_mode_ask = memnew(ConfirmationDialog);
 		open_recovery_mode_ask->set_min_size(Size2(550, 70) * EDSCALE);
