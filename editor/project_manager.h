@@ -150,6 +150,7 @@ class ProjectManager : public Control {
 	Button *manage_tags_btn = nullptr;
 	Button *erase_btn = nullptr;
 	Button *erase_missing_btn = nullptr;
+	Button *quick_settings_button2 = nullptr;
 
 	EditorFileDialog *scan_dir = nullptr;
 
