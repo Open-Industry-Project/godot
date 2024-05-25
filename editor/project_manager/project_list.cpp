@@ -1284,7 +1284,6 @@ void ProjectList::_open_menu(const Vector2 &p_at, Control *p_hb) {
 		project_context_menu->add_item(TTRC("Open in Editor"), MENU_EDIT);
 		project_context_menu->add_item(TTRC("Open in Editor (Verbose Mode)"), MENU_EDIT_VERBOSE);
 		project_context_menu->add_item(TTRC("Open in Editor (Recovery Mode)"), MENU_EDIT_RECOVERY);
-		project_context_menu->add_item(TTRC("Run Project"), MENU_RUN);
 		project_context_menu->add_separator();
 #if !defined(ANDROID_ENABLED) && !defined(WEB_ENABLED)
 		project_context_menu->add_item(OS::get_singleton()->get_platform_string(OS::PLATFORM_STRING_FILE_MANAGER_OPEN), MENU_SHOW_IN_FILE_MANAGER);
@@ -1305,7 +1304,6 @@ void ProjectList::_open_menu(const Vector2 &p_at, Control *p_hb) {
 				 MENU_EDIT,
 				 MENU_EDIT_VERBOSE,
 				 MENU_EDIT_RECOVERY,
-				 MENU_RUN,
 #if !defined(ANDROID_ENABLED) && !defined(WEB_ENABLED)
 				 MENU_SHOW_IN_FILE_MANAGER,
 #endif
@@ -1328,7 +1326,6 @@ void ProjectList::_update_menu_icons() {
 	project_context_menu->set_item_icon(project_context_menu->get_item_index(MENU_EDIT), get_editor_theme_icon("Edit"));
 	project_context_menu->set_item_icon(project_context_menu->get_item_index(MENU_EDIT_VERBOSE), get_editor_theme_icon("Notification"));
 	project_context_menu->set_item_icon(project_context_menu->get_item_index(MENU_EDIT_RECOVERY), get_editor_theme_icon("NodeWarning"));
-	project_context_menu->set_item_icon(project_context_menu->get_item_index(MENU_RUN), get_editor_theme_icon("Play"));
 #if !defined(ANDROID_ENABLED) && !defined(WEB_ENABLED)
 	project_context_menu->set_item_icon(project_context_menu->get_item_index(MENU_SHOW_IN_FILE_MANAGER), get_editor_theme_icon("Load"));
 #endif
