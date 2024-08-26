@@ -1267,7 +1267,7 @@ ProjectManager::ProjectManager() {
 			import_btn->set_text(TTR("Import"));
 			import_btn->set_shortcut(ED_SHORTCUT("project_manager/import_project", TTR("Import Project"), KeyModifierMask::CMD_OR_CTRL | Key::I));
 			import_btn->connect(SceneStringName(pressed), callable_mp(this, &ProjectManager::_import_project));
-			//hb->add_child(import_btn);
+			hb->add_child(import_btn);
 
 			scan_btn = memnew(Button);
 			scan_btn->set_text(TTR("Scan"));
