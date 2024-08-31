@@ -281,10 +281,15 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 			Color preset_accent_color;
 			Color preset_base_color;
 			float preset_contrast = 0;
+			float preset_icon_saturation = 2.0;
 			bool preset_draw_extra_borders = false;
 
 			// Please use alphabetical order if you're adding a new theme here.
-			if (config.preset == "Breeze Dark") {
+			if (config.preset == "Godot") {
+				preset_accent_color = Color(0.44, 0.73, 0.98);
+				preset_base_color = Color(0.21, 0.24, 0.29);
+				preset_contrast = config.default_contrast;
+			} else if (config.preset == "Breeze Dark") {
 				preset_accent_color = Color(0.26, 0.76, 1.00);
 				preset_base_color = Color(0.24, 0.26, 0.28);
 				preset_contrast = config.default_contrast;
@@ -317,20 +322,23 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 				preset_contrast = 0.0;
 				preset_draw_extra_borders = true;
 			} else { // Default
-				preset_accent_color = Color(0.44, 0.73, 0.98);
-				preset_base_color = Color(0.21, 0.24, 0.29);
-				preset_contrast = config.default_contrast;
+				preset_accent_color = Color(0.337, 0.62, 1.00);
+				preset_base_color = Color(0.145, 0.145, 0.145);
+				preset_contrast = 0.2;
+				preset_icon_saturation = 2.0;
 			}
 
 			config.accent_color = preset_accent_color;
 			config.base_color = preset_base_color;
 			config.contrast = preset_contrast;
 			config.draw_extra_borders = preset_draw_extra_borders;
+			config.icon_saturation = preset_icon_saturation;
 
 			EditorSettings::get_singleton()->set_initial_value("interface/theme/accent_color", config.accent_color);
 			EditorSettings::get_singleton()->set_initial_value("interface/theme/base_color", config.base_color);
 			EditorSettings::get_singleton()->set_initial_value("interface/theme/contrast", config.contrast);
 			EditorSettings::get_singleton()->set_initial_value("interface/theme/draw_extra_borders", config.draw_extra_borders);
+			EditorSettings::get_singleton()->set_initial_value("interface/theme/icon_saturation", config.icon_saturation);
 		}
 
 		if (follow_system_theme && system_base_color != Color(0, 0, 0, 0)) {
@@ -349,6 +357,7 @@ EditorThemeManager::ThemeConfiguration EditorThemeManager::_create_theme_config(
 		EditorSettings::get_singleton()->set_manually("interface/theme/base_color", config.base_color);
 		EditorSettings::get_singleton()->set_manually("interface/theme/contrast", config.contrast);
 		EditorSettings::get_singleton()->set_manually("interface/theme/draw_extra_borders", config.draw_extra_borders);
+		EditorSettings::get_singleton()->set_initial_value("interface/theme/icon_saturation", config.icon_saturation);
 	}
 
 	// Handle theme spacing preset.
