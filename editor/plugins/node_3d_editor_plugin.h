@@ -214,6 +214,8 @@ private:
 	double gpu_time_history[FRAME_TIME_HISTORY];
 	int gpu_time_history_index;
 
+	bool freeze = false;
+
 	int index;
 	ViewType view_type;
 	void _menu_option(int p_option);
