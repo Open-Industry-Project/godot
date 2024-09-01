@@ -226,6 +226,8 @@ private:
 	Ref<StandardMaterial3D> ruler_material;
 	Ref<StandardMaterial3D> ruler_material_xray;
 
+	bool freeze = false;
+
 	int index;
 	ViewType view_type;
 	void _menu_option(int p_option);
