@@ -212,6 +212,8 @@ private:
 	Label *ruler_label_y = nullptr;
 	Label *ruler_label_z = nullptr;
 
+	bool freeze = false;
+
 	int index;
 	void _menu_option(int p_option);
 	Node3D *preview_node = nullptr;
