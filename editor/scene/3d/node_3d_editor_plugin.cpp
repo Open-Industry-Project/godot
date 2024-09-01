@@ -104,6 +104,7 @@
 #include "scene/resources/3d/sky_material.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/surface_tool.h"
+#include <scene/3d/physics/rigid_body_3d.h>
 
 constexpr real_t DISTANCE_DEFAULT = 4;
 
@@ -2730,6 +2731,23 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 					}
 					_edit.mode = TRANSFORM_TRANSLATE;
 					collision_reposition = true;
+
+					if (!freeze) {
+						const List<Node *> &selection = editor_selection->get_top_selected_node_list();
+						for (Node *E : selection) {
+							Array children = E->get_children();
+
+							for (int i = 0; i < children.size(); i++) {
+								RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
+								if (rb) {
+									if (rb->is_freeze_enabled() == false) {
+										rb->set_freeze_enabled(true);
+										freeze = true;
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -5612,6 +5630,22 @@ void Node3DEditorViewport::commit_transform() {
 	collision_reposition = false;
 	finish_transform();
 	set_message("");
+
+	if (freeze) {
+		freeze = false;
+		const List<Node *> &selection = editor_selection->get_top_selected_node_list();
+		for (Node *E : selection) {
+			Array children = E->get_children();
+
+			for (int i = 0; i < children.size(); i++) {
+				RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
+				if (rb) {
+					rb->set_freeze_enabled(false);
+				}
+			}
+		}
+	}
+
 }
 
 void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
@@ -5667,6 +5701,23 @@ void Node3DEditorViewport::update_transform(bool p_shift) {
 	// View-plane translate/scale always uses global coords; rotation and axis operations respect local/global preference.
 	bool local_coords = spatial_editor->are_local_coords_enabled() &&
 			!(_edit.plane == TRANSFORM_VIEW && _edit.mode != TRANSFORM_ROTATE);
+
+	if (!freeze) {
+		const List<Node *> &selection = editor_selection->get_top_selected_node_list();
+		for (Node *E : selection) {
+			Array children = E->get_children();
+
+			for (int i = 0; i < children.size(); i++) {
+				RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
+				if (rb) {
+					if (rb->is_freeze_enabled() == false) {
+						rb->set_freeze_enabled(true);
+						freeze = true;
+					}
+				}
+			}
+		}
+	}
 
 	switch (_edit.mode) {
 		case TRANSFORM_SCALE: {
