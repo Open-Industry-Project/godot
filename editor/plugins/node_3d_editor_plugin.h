@@ -247,6 +247,7 @@ private:
 	bool auto_orthogonal;
 	bool lock_rotation;
 	bool transform_gizmo_visible = true;
+	bool collision_reposition = false;
 	real_t gizmo_scale;
 
 	bool freelook_active;
@@ -340,7 +341,6 @@ private:
 		TRANSFORM_ROTATE,
 		TRANSFORM_TRANSLATE,
 		TRANSFORM_SCALE
-
 	};
 	enum TransformPlane {
 		TRANSFORM_VIEW,
