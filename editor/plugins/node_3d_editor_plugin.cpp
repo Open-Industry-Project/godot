@@ -2442,6 +2442,23 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 					}
 					_edit.mode = TRANSFORM_TRANSLATE;
 					collision_reposition = true;
+
+					if (!freeze) {
+						List<Node *> &selection = editor_selection->get_selected_node_list();
+						for (Node *E : selection) {
+							Array children = E->get_children();
+
+							for (int i = 0; i < children.size(); i++) {
+								RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
+								if (rb) {
+									if (rb->is_freeze_enabled() == false) {
+										rb->set_freeze_enabled(true);
+										freeze = true;
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
@@ -3103,7 +3120,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 					int snap_step_decimals = Math::range_step_decimals(snap);
 					set_message(TTR("Translating:") + " (" + String::num(first_selected_node->get_global_position().x, snap_step_decimals) + ", " +
 							String::num(first_selected_node->get_global_position().y, snap_step_decimals) + ", " + String::num(first_selected_node->get_global_position().z, snap_step_decimals) + ")");
-					first_selected_node->set_global_position(spatial_editor->snap_point(_get_instance_position(_edit.mouse_pos)));
+					first_selected_node->set_global_position(spatial_editor->snap_point(_get_instance_position(_edit.mouse_pos, first_selected_node)));
 				}
 			}
 
@@ -3111,7 +3128,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 				return;
 			}
 			if (preview_node->is_inside_tree()) {
-				preview_node_pos = spatial_editor->snap_point(_get_instance_position(preview_node_viewport_pos));
+				preview_node_pos = spatial_editor->snap_point(_get_instance_position(preview_node_viewport_pos,preview_node));
 				double snap = EDITOR_GET("interface/inspector/default_float_step");
 				int snap_step_decimals = Math::range_step_decimals(snap);
 				set_message(TTR("Instantiating:") + " (" + String::num(preview_node_pos.x, snap_step_decimals) + ", " +
@@ -4288,7 +4305,7 @@ void _insert_rid_recursive(Node *node, HashSet<RID> &rids) {
 	}
 }
 
-Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos) const {
+Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos, Node3D *p_node) const {
 	const float MAX_DISTANCE = 50.0;
 	const float FALLBACK_DISTANCE = 5.0;
 
@@ -4317,7 +4334,7 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos) const 
 	ray_params.to = world_pos + world_ray * camera->get_far();
 
 	PhysicsDirectSpaceState3D::RayResult result;
-	if (ss->intersect_ray(ray_params, result) && preview_node->get_child_count() > 0) {
+	if (ss->intersect_ray(ray_params, result) && preview_node->get_child_count() > 0 || !preview_node->is_inside_tree()) {
 		// Calculate an offset for the `preview_node` such that the its bounding box is on top of and touching the contact surface's plane.
 
 		// Use the Gram-Schmidt process to get an orthonormal Basis aligned with the surface normal.
@@ -4333,8 +4350,8 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos) const 
 		const Basis bb_basis = Basis(bb_basis_x, bb_basis_y, bb_basis_z);
 
 		// This normal-aligned Basis allows us to create an AABB that can fit on the surface plane as snugly as possible.
-		const Transform3D bb_transform = Transform3D(bb_basis, preview_node->get_transform().origin);
-		const AABB preview_node_bb = _calculate_spatial_bounds(preview_node, true, &bb_transform);
+		const Transform3D bb_transform = Transform3D(bb_basis, p_node->get_transform().origin);
+		const AABB preview_node_bb = _calculate_spatial_bounds(p_node, true, &bb_transform);
 		// The x-axis's alignment with the surface normal also makes it trivial to get the distance from `preview_node`'s origin at (0, 0, 0) to the correct AABB face.
 		const float offset_distance = -preview_node_bb.position.x;
 
@@ -5605,7 +5622,7 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	ED_SHORTCUT("spatial_editor/instant_translate", TTR("Begin Translate Transformation"));
 	ED_SHORTCUT("spatial_editor/instant_rotate", TTR("Begin Rotate Transformation"));
 	ED_SHORTCUT("spatial_editor/instant_scale", TTR("Begin Scale Transformation"));
-	ED_SHORTCUT("spatial_editor/collision_reposition", TTR("Reposition Using Collisions"));
+	ED_SHORTCUT("spatial_editor/collision_reposition", TTR("Reposition Using Collisions"), Key::C);
 
 	preview_camera = memnew(CheckBox);
 	preview_camera->set_text(TTR("Preview"));
