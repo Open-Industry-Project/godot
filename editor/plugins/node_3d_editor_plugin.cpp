@@ -2442,6 +2442,23 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 					}
 					_edit.mode = TRANSFORM_TRANSLATE;
 					collision_reposition = true;
+
+					if (!freeze) {
+						List<Node *> &selection = editor_selection->get_selected_node_list();
+						for (Node *E : selection) {
+							Array children = E->get_children();
+
+							for (int i = 0; i < children.size(); i++) {
+								RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
+								if (rb) {
+									if (rb->is_freeze_enabled() == false) {
+										rb->set_freeze_enabled(true);
+										freeze = true;
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 		}
