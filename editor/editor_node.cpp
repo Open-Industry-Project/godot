@@ -5538,6 +5538,7 @@ void EditorNode::_load_editor_layout() {
 		ep.step(TTR("Editor layout ready."), 5, true);
 	}
 	load_editor_layout_done = true;
+	emit_signal(SNAME("editor_layout_loaded"));
 }
 
 void EditorNode::_save_central_editor_layout_to_config(Ref<ConfigFile> p_config_file) {
@@ -6984,6 +6985,7 @@ void EditorNode::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("scene_saved", PropertyInfo(Variant::STRING, "path")));
 	ADD_SIGNAL(MethodInfo("scene_changed"));
 	ADD_SIGNAL(MethodInfo("scene_closed", PropertyInfo(Variant::STRING, "path")));
+	ADD_SIGNAL(MethodInfo("editor_layout_loaded"));
 }
 
 static Node *_resource_get_edited_scene() {
