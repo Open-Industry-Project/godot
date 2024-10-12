@@ -6335,6 +6335,7 @@ void EditorNode::_load_editor_layout() {
 		ep.step(TTR("Editor layout ready."), 5, true);
 	}
 	load_editor_layout_done = true;
+	emit_signal(SNAME("editor_layout_loaded"));
 }
 
 void EditorNode::_save_central_editor_layout_to_config(Ref<ConfigFile> p_config_file) {
@@ -7885,6 +7886,7 @@ void EditorNode::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("preview_locale_changed"));
 	ADD_SIGNAL(MethodInfo("resource_counter_changed"));
 	ADD_SIGNAL(MethodInfo("distraction_free_mode_changed", PropertyInfo(Variant::BOOL, "enabled")));
+	ADD_SIGNAL(MethodInfo("editor_layout_loaded"));
 }
 
 static Node *_resource_get_edited_scene() {
