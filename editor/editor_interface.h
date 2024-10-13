@@ -162,6 +162,8 @@ public:
 	void edit_script(const Ref<Script> &p_script, int p_line = -1, int p_col = 0, bool p_grab_focus = true);
 	void open_scene_from_path(const String &scene_path);
 	void reload_scene_from_path(const String &scene_path);
+	Vector3 get_transform_vector() const;
+	double get_transform_snap() const;
 
 	PackedStringArray get_open_scenes() const;
 	Node *get_edited_scene_root() const;

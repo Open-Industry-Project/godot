@@ -5013,6 +5013,8 @@ void Node3DEditorViewport::commit_transform() {
 }
 
 void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
+	Node3DEditor::get_singleton()->transform_vector = p_motion;
+	Node3DEditor::get_singleton()->snap = p_snap;
 	bool local_coords = (spatial_editor->are_local_coords_enabled() && _edit.plane != TRANSFORM_VIEW);
 	List<Node *> &selection = editor_selection->get_selected_node_list();
 	for (Node *E : selection) {

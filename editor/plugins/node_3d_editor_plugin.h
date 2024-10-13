@@ -887,6 +887,8 @@ public:
 	static Node3DEditor *get_singleton() { return singleton; }
 
 	Vector3 snap_point(Vector3 p_target, Vector3 p_start = Vector3(0, 0, 0)) const;
+	Vector3 transform_vector = Vector3(0, 0, 0);
+	double snap = 0;
 
 	float get_znear() const { return settings_znear->get_value(); }
 	float get_zfar() const { return settings_zfar->get_value(); }

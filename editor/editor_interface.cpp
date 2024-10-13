@@ -534,6 +534,14 @@ bool EditorInterface::is_movie_maker_enabled() const {
 	return EditorRunBar::get_singleton()->is_movie_maker_enabled();
 }
 
+Vector3 EditorInterface::get_transform_vector() const {
+	return Node3DEditor::get_singleton()->transform_vector;
+}
+
+double EditorInterface::get_transform_snap() const {
+	return Node3DEditor::get_singleton()->snap;
+}
+
 #ifdef TOOLS_ENABLED
 void EditorInterface::get_argument_options(const StringName &p_function, int p_idx, List<String> *r_options) const {
 	const String pf = p_function;
@@ -634,6 +642,9 @@ void EditorInterface::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("mark_scene_as_unsaved"), &EditorInterface::mark_scene_as_unsaved);
 	ClassDB::bind_method(D_METHOD("mark_scene_as_saved"), &EditorInterface::mark_scene_as_saved);
+
+	ClassDB::bind_method(D_METHOD("get_transform_vector"), &EditorInterface::get_transform_vector);
+	ClassDB::bind_method(D_METHOD("get_transform_snap"), &EditorInterface::get_transform_snap);
 
 	// Scene playback.
 
