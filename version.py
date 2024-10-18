@@ -1,10 +1,10 @@
 short_name = "OIP"
 name = "Open Industry Project"
 major = 4
-minor = 3
+minor = 4
 patch = 0
-status = "stable"
+status = "dev"
 module_config = ""
 year = 2024
 website = "https://github.com/Automation-Standard/Open-Industry-Project"
-docs = "4.3"
+docs = "latest"
