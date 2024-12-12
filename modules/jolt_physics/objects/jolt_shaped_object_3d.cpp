@@ -69,7 +69,7 @@ JPH::ShapeRefC JoltShapedObject3D::_try_build_shape(bool p_optimize_compound) {
 
 	if (scale != Vector3(1, 1, 1)) {
 		Vector3 actual_scale = scale;
-		JOLT_ENSURE_SCALE_VALID(result, actual_scale, vformat("Failed to correctly scale body '%s'.", to_string()));
+		//JOLT_ENSURE_SCALE_VALID(result, actual_scale, vformat("Failed to correctly scale body '%s'.", to_string()));
 		result = JoltShape3D::with_scale(result, actual_scale);
 	}
 

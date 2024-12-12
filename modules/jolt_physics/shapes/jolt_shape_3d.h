@@ -127,7 +127,7 @@ public:
 #define JOLT_ENSURE_SCALE_VALID(m_shape, m_scale, m_msg)                             \
 	if (true) {                                                                      \
 		const Vector3 valid_scale = JoltShape3D::make_scale_valid(m_shape, m_scale); \
-		ERR_PRINT_INVALID_SCALE_MSG(m_scale, valid_scale, m_msg);                    \
+		/*ERR_PRINT_INVALID_SCALE_MSG(m_scale, valid_scale, m_msg);*/                \
 		(m_scale) = valid_scale;                                                     \
 	} else                                                                           \
 		((void)0)
