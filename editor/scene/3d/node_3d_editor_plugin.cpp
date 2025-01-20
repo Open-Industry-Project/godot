@@ -2342,6 +2342,9 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 				if (b->is_pressed()) {
 					clicked_wants_append = b->is_shift_pressed();
 
+					if (view_3d_controller->is_freelook_enabled()) {
+						break;
+					}
 					if (_edit.mode != TRANSFORM_NONE && (_edit.instant || collision_reposition)) {
 						commit_transform();
 						break; // just commit the edit, stop processing the event so we don't deselect the object
@@ -2559,6 +2562,12 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 
 					surface->queue_redraw();
 				} else {
+					if (view_3d_controller->is_freelook_enabled()) {
+						clicked = ObjectID();
+						view_3d_controller->cursor.region_select = false;
+						break;
+					}
+
 					if (ruler->is_inside_tree()) {
 						EditorNode::get_singleton()->get_scene_root()->remove_child(ruler);
 						ruler_start_point->set_visible(false);
@@ -2721,7 +2730,7 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 			String n = _edit.gizmo->get_handle_name(_edit.gizmo_handle, _edit.gizmo_handle_secondary);
 			set_message(n + ": " + String(v));
 
-		} else if (m->get_button_mask().has_flag(MouseButtonMask::LEFT)) {
+		} else if (m->get_button_mask().has_flag(MouseButtonMask::LEFT) && !view_3d_controller->is_freelook_enabled()) {
 			movement_threshold_passed = _edit.original_mouse_pos.distance_to(_edit.mouse_pos) > 8 * EDSCALE;
 
 			if ((selection_in_progress || clicked_wants_append || spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_SELECT) && movement_threshold_passed && clicked.is_valid() && !previewing) {
