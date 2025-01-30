@@ -339,13 +339,13 @@ public:
 	virtual void soft_body_set_ray_pickable(RID p_body, bool p_enable) override {}
 
 	virtual void soft_body_set_simulation_precision(RID p_body, int p_simulation_precision) override {}
-	virtual int soft_body_get_simulation_precision(RID p_body) const override { return 0; }
+	virtual int soft_body_get_simulation_precision(RID p_body) const override { return 5; }
 
 	virtual void soft_body_set_total_mass(RID p_body, real_t p_total_mass) override {}
-	virtual real_t soft_body_get_total_mass(RID p_body) const override { return 0; }
+	virtual real_t soft_body_get_total_mass(RID p_body) const override { return 1.0; }
 
 	virtual void soft_body_set_linear_stiffness(RID p_body, real_t p_stiffness) override {}
-	virtual real_t soft_body_get_linear_stiffness(RID p_body) const override { return 0; }
+	virtual real_t soft_body_get_linear_stiffness(RID p_body) const override { return 0.5; }
 
 	virtual void soft_body_set_shrinking_factor(RID p_body, real_t p_shrinking_factor) override {}
 	virtual real_t soft_body_get_shrinking_factor(RID p_body) const override { return 0; }
@@ -354,7 +354,7 @@ public:
 	virtual real_t soft_body_get_pressure_coefficient(RID p_body) const override { return 0; }
 
 	virtual void soft_body_set_damping_coefficient(RID p_body, real_t p_damping_coefficient) override {}
-	virtual real_t soft_body_get_damping_coefficient(RID p_body) const override { return 0; }
+	virtual real_t soft_body_get_damping_coefficient(RID p_body) const override { return 0.01; }
 
 	virtual void soft_body_set_drag_coefficient(RID p_body, real_t p_drag_coefficient) override {}
 	virtual real_t soft_body_get_drag_coefficient(RID p_body) const override { return 0; }
