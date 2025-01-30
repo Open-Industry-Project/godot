@@ -125,12 +125,6 @@ static PhysicsServer2D *_create_dummy_physics_server_2d() {
 }
 #endif // PHYSICS_2D_DISABLED
 
-#ifndef PHYSICS_3D_DISABLED
-static PhysicsServer3D *_create_dummy_physics_server_3d() {
-	return memnew(PhysicsServer3DDummy);
-}
-#endif // PHYSICS_3D_DISABLED
-
 static bool has_server_feature_callback(const String &p_feature) {
 	if (RenderingServer::get_singleton()) {
 		if (RenderingServer::get_singleton()->has_os_feature(p_feature)) {
@@ -353,7 +347,6 @@ void register_server_types() {
 
 	GLOBAL_DEF(PropertyInfo(Variant::STRING, PhysicsServer3DManager::setting_property_name, PROPERTY_HINT_ENUM, "DEFAULT"), "DEFAULT");
 
-	PhysicsServer3DManager::get_singleton()->register_server("Dummy", callable_mp_static(_create_dummy_physics_server_3d));
 #endif // PHYSICS_3D_DISABLED
 
 #ifndef XR_DISABLED

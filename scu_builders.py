@@ -347,8 +347,6 @@ def generate_scu_files(max_includes_per_scu):
     process_folder(["modules/gltf/extensions"])
     process_folder(["modules/gltf/extensions/physics"])
     process_folder(["modules/godot_physics_2d"])
-    process_folder(["modules/godot_physics_3d"])
-    process_folder(["modules/godot_physics_3d/joints"])
     process_folder(["modules/gridmap"])
     process_folder(["modules/interactive_music"])
     process_folder(["modules/jolt_physics"])
