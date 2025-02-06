@@ -2056,9 +2056,12 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 
 	Ref<InputEventMouseMotion> m = p_event;
 
-	// Instant transforms process mouse motion in input() to handle wrapping.
-	if (m.is_valid() && !_edit.instant) {
-		_edit.mouse_pos = m->get_position();
+	if (m.is_valid()) {
+		if (cursor.region_select || ruler->is_inside_tree()) {
+			_edit.mouse_pos = m->get_position();
+		} else {
+			_edit.mouse_pos += _get_warped_mouse_motion(p_event);
+		}
 
 		if (spatial_editor->get_single_selected_node()) {
 			Vector<Ref<Node3DGizmo>> gizmos = spatial_editor->get_single_selected_node()->get_gizmos();
