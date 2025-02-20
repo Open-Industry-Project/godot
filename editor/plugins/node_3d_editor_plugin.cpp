@@ -1661,13 +1661,17 @@ void Node3DEditorViewport::_list_select(Ref<InputEventMouseButton> b) {
 	}
 }
 
-// This is only active during instant transforms,
+// This is only active during instant transforms and when the mouse is captured,
 // to capture and wrap mouse events outside the control.
 void Node3DEditorViewport::input(const Ref<InputEvent> &p_event) {
-	ERR_FAIL_COND(!_edit.instant);
 	Ref<InputEventMouseMotion> m = p_event;
 
 	if (m.is_valid()) {
+		if (Input::get_singleton()->get_mouse_mode() == Input::MOUSE_MODE_CAPTURED) {
+			_nav_look(m, _get_warped_mouse_motion(m));
+			return;
+		}
+
 		_edit.mouse_pos += _get_warped_mouse_motion(p_event);
 		update_transform(_get_key_modifier(m) == Key::SHIFT);
 	}
@@ -2139,12 +2143,10 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 
 				update_transform(_get_key_modifier(m) == Key::SHIFT);
 			}
-		} else if (m->get_button_mask().has_flag(MouseButtonMask::RIGHT) || freelook_active) {
+		} else if (m->get_button_mask().has_flag(MouseButtonMask::RIGHT)) {
 			NavigationMode change_nav_from_shortcut = _get_nav_mode_from_shortcut_check(NAVIGATION_RIGHT_MOUSE, shortcut_check_sets, false);
 			if (m->get_button_mask().has_flag(MouseButtonMask::RIGHT) && change_nav_from_shortcut != NAVIGATION_NONE) {
 				nav_mode = change_nav_from_shortcut;
-			} else if (freelook_active) {
-				nav_mode = NAVIGATION_LOOK;
 			} else if (orthogonal) {
 				nav_mode = NAVIGATION_PAN;
 			}
@@ -2682,6 +2684,7 @@ void Node3DEditorViewport::set_freelook_active(bool active_now) {
 
 		// Hide mouse like in an FPS (warping doesn't work)
 		Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_CAPTURED);
+		set_process_input(true);
 
 	} else if (freelook_active && !active_now) {
 		// Sync camera cursor to cursor to "cut" interpolation jumps due to changing referential
@@ -2689,6 +2692,7 @@ void Node3DEditorViewport::set_freelook_active(bool active_now) {
 
 		// Restore mouse
 		Input::get_singleton()->set_mouse_mode(Input::MOUSE_MODE_VISIBLE);
+		set_process_input(false);
 
 		// Restore the previous mouse position when leaving freelook mode.
 		// This is done because leaving `Input.MOUSE_MODE_CAPTURED` will center the cursor
