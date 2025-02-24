@@ -197,29 +197,7 @@ void Node::_notification(int p_notification) {
 		} break;
 
 		case NOTIFICATION_READY: {
-			if (GDVIRTUAL_IS_OVERRIDDEN(_input)) {
-				set_process_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_shortcut_input)) {
-				set_process_shortcut_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_input)) {
-				set_process_unhandled_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_key_input)) {
-				set_process_unhandled_key_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_process)) {
-				set_process(true);
-			}
-			if (GDVIRTUAL_IS_OVERRIDDEN(_physics_process)) {
-				set_physics_process(true);
-			}
-
+			_set_processes();
 			GDVIRTUAL_CALL(_ready);
 		} break;
 
@@ -259,6 +237,31 @@ void Node::_notification(int p_notification) {
 				data.is_auto_translate_dirty = true;
 			}
 		} break;
+	}
+}
+
+void Node::_set_processes() {
+	if (GDVIRTUAL_IS_OVERRIDDEN(_input)) {
+		set_process_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_shortcut_input)) {
+		set_process_shortcut_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_input)) {
+		set_process_unhandled_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_key_input)) {
+		set_process_unhandled_key_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_process)) {
+		set_process(true);
+	}
+	if (GDVIRTUAL_IS_OVERRIDDEN(_physics_process)) {
+		set_physics_process(true);
 	}
 }
 
@@ -3891,6 +3894,10 @@ Node::~Node() {
 void Node::set_script(const Variant &p_script) {
 	ERR_THREAD_GUARD;
 	Object::set_script(p_script);
+	Ref<Script> s = p_script;
+	if (s.is_valid()) {
+		s->connect("reloaded", callable_mp(this, &Node::_set_processes));
+	}
 }
 
 Variant Node::get_script() const {
