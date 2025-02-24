@@ -898,6 +898,7 @@ Error GDScript::reload(bool p_keep_state) {
 #endif
 
 	reloading = false;
+	emit_signal("reloaded");
 	return OK;
 }
 
@@ -1076,6 +1077,7 @@ void GDScript::_get_property_list(List<PropertyInfo> *p_properties) const {
 
 void GDScript::_bind_methods() {
 	ClassDB::bind_vararg_method(METHOD_FLAGS_DEFAULT, "new", &GDScript::_new, MethodInfo("new"));
+	ADD_SIGNAL(MethodInfo("reloaded"));
 }
 
 void GDScript::set_path_cache(const String &p_path) {

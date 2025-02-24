@@ -305,6 +305,8 @@ private:
 
 	void _replace_connections_target(Node *p_new_target);
 
+	void _set_processes();
+
 	void _validate_child_name(Node *p_child, bool p_force_human_readable = false);
 	void _generate_serial_child_name(const Node *p_child, StringName &name) const;
 

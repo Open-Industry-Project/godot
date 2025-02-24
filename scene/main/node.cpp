@@ -42,6 +42,7 @@ STATIC_ASSERT_INCOMPLETE_TYPE(class, Engine);
 #include "core/config/project_settings.h"
 #include "core/io/resource.h"
 #include "core/io/resource_loader.h"
+#include "core/object/callable_mp.h"
 #include "core/object/class_db.h"
 #include "core/object/message_queue.h"
 #include "core/object/script_language.h"
@@ -253,29 +254,7 @@ void Node::_notification(int p_notification) {
 		} break;
 
 		case NOTIFICATION_READY: {
-			if (GDVIRTUAL_IS_OVERRIDDEN(_input)) {
-				set_process_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_shortcut_input)) {
-				set_process_shortcut_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_input)) {
-				set_process_unhandled_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_key_input)) {
-				set_process_unhandled_key_input(true);
-			}
-
-			if (GDVIRTUAL_IS_OVERRIDDEN(_process)) {
-				set_process(true);
-			}
-			if (GDVIRTUAL_IS_OVERRIDDEN(_physics_process)) {
-				set_physics_process(true);
-			}
-
+			_set_processes();
 			GDVIRTUAL_CALL(_ready);
 		} break;
 
@@ -317,6 +296,31 @@ void Node::_notification(int p_notification) {
 				data.is_auto_translate_dirty = true;
 			}
 		} break;
+	}
+}
+
+void Node::_set_processes() {
+	if (GDVIRTUAL_IS_OVERRIDDEN(_input)) {
+		set_process_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_shortcut_input)) {
+		set_process_shortcut_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_input)) {
+		set_process_unhandled_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_unhandled_key_input)) {
+		set_process_unhandled_key_input(true);
+	}
+
+	if (GDVIRTUAL_IS_OVERRIDDEN(_process)) {
+		set_process(true);
+	}
+	if (GDVIRTUAL_IS_OVERRIDDEN(_physics_process)) {
+		set_physics_process(true);
 	}
 }
 
@@ -4152,7 +4156,19 @@ Node::~Node() {
 
 void Node::set_script(const Variant &p_script) {
 	ERR_THREAD_GUARD;
+
+	Ref<Script> old_script = get_script();
+	if (old_script.is_valid()) {
+		if (old_script->is_connected("reloaded", callable_mp(this, &Node::_set_processes))) {
+			old_script->disconnect("reloaded", callable_mp(this, &Node::_set_processes));
+		}
+	}
+
 	Object::set_script(p_script);
+	Ref<Script> s = p_script;
+	if (s.is_valid()) {
+		s->connect("reloaded", callable_mp(this, &Node::_set_processes));
+	}
 }
 
 Variant Node::get_script() const {
