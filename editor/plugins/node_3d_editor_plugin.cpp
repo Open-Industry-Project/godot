@@ -2508,7 +2508,7 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 					collision_reposition = true;
 
 					if (!freeze) {
-						List<Node *> &selection = editor_selection->get_selected_node_list();
+						const List<Node *> &selection = editor_selection->get_selected_node_list();
 						for (Node *E : selection) {
 							Array children = E->get_children();
 
@@ -5201,7 +5201,7 @@ void Node3DEditorViewport::commit_transform() {
 
 	if (freeze) {
 		freeze = false;
-		List<Node *> &selection = editor_selection->get_selected_node_list();
+		const List<Node *> &selection = editor_selection->get_selected_node_list();
 		for (Node *E : selection) {
 			Array children = E->get_children();
 
@@ -5261,7 +5261,7 @@ void Node3DEditorViewport::update_transform(bool p_shift) {
 	int snap_step_decimals = Math::range_step_decimals(snap);
 
 	if (!freeze) {
-		List<Node *> &selection = editor_selection->get_selected_node_list();
+		const List<Node *> &selection = editor_selection->get_selected_node_list();
 		for (Node *E : selection) {
 			Array children = E->get_children();
 
