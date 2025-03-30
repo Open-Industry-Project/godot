@@ -41,6 +41,7 @@
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/docks/scene_tree_dock.h"
 #include "editor/editor_main_screen.h"
+#include "editor/editor_interface.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
 #include "editor/editor_undo_redo_manager.h"
@@ -725,6 +726,10 @@ void Node3DEditorViewport::cancel_transform() {
 	}
 
 	collision_reposition = false;
+	spatial_editor->transform_gizmo_data["motion"] = Vector3();
+	spatial_editor->transform_gizmo_data["snap"] = 0;
+	EditorInterface::get_singleton()->get_transform_gizmo_data(spatial_editor->transform_gizmo_data);
+	EditorInterface::get_singleton()->get_transform_commited();
 	finish_transform();
 	set_message(TTRC("Transform Aborted."), 3);
 }
@@ -5745,6 +5750,7 @@ void Node3DEditorViewport::commit_transform() {
 	undo_redo->commit_action();
 
 	collision_reposition = false;
+	EditorInterface::get_singleton()->get_transform_commited();
 	finish_transform();
 	set_message("");
 
@@ -5773,6 +5779,12 @@ void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
 	bool is_global_view_plane = (_edit.plane == TRANSFORM_VIEW) &&
 			((_edit.mode != TRANSFORM_ROTATE) || !spatial_editor->are_local_coords_enabled());
 
+	if (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_SCALE) {
+		spatial_editor->transform_gizmo_data["motion"] = p_motion;
+		spatial_editor->transform_gizmo_data["snap"] = p_snap;
+		EditorInterface::get_singleton()->get_transform_gizmo_data(spatial_editor->transform_gizmo_data);
+	}
+
 	bool relative_transform = spatial_editor->is_relative_transform_enabled();
 	const List<Node *> &selection = editor_selection->get_top_selected_node_list();
 	Node3D *active_node = spatial_editor->get_active_node();
@@ -5798,6 +5810,10 @@ void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
 		}
 
 		if (sp->has_meta("_edit_lock_") && !spatial_editor->is_gizmo_visible()) {
+			continue;
+		}
+
+		if (sp->has_meta("hijack_scale") && spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_SCALE) {
 			continue;
 		}
 
