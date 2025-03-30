@@ -38,6 +38,7 @@
 #include "core/os/keyboard.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/editor_main_screen.h"
+#include "editor/editor_interface.h"
 #include "editor/editor_node.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_string_names.h"
@@ -5105,6 +5106,15 @@ void Node3DEditorViewport::commit_transform() {
 }
 
 void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
+	spatial_editor->transform_gizmo_data["motion"] = p_motion;
+	spatial_editor->transform_gizmo_data["snap"] = p_snap;
+
+	EditorInterface::get_singleton()->get_transform_gizmo_data(spatial_editor->transform_gizmo_data);
+
+	if (EditorInterface::get_singleton()->scale_gizmo_disabled && spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_SCALE) {
+		return;
+	}
+
 	bool local_coords = (spatial_editor->are_local_coords_enabled() && _edit.plane != TRANSFORM_VIEW);
 	const List<Node *> &selection = editor_selection->get_top_selected_node_list();
 	for (Node *E : selection) {

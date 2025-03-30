@@ -395,6 +395,14 @@ SubViewport *EditorInterface::get_editor_viewport_3d(int p_idx) const {
 	return Node3DEditor::get_singleton()->get_editor_viewport(p_idx)->get_viewport_node();
 }
 
+void EditorInterface::get_transform_gizmo_data(Dictionary data) {
+	emit_signal("transform_requested", data);
+}
+
+void EditorInterface::set_scale_gizmo_disabled(bool p_disable) {
+	scale_gizmo_disabled = p_disable;
+}
+
 void EditorInterface::set_main_screen_editor(const String &p_name) {
 	EditorNode::get_singleton()->get_editor_main_screen()->select_by_name(p_name);
 }
@@ -810,6 +818,8 @@ void EditorInterface::_bind_methods() {
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "distraction_free_mode"), "set_distraction_free_mode", "is_distraction_free_mode_enabled");
 
+	ClassDB::bind_method(D_METHOD("set_scale_gizmo_disabled", "disable"), &EditorInterface::set_scale_gizmo_disabled);
+
 	// Editor dialogs.
 
 	ClassDB::bind_method(D_METHOD("popup_node_selector", "callback", "valid_types", "current_value"), &EditorInterface::popup_node_selector, DEFVAL(TypedArray<StringName>()), DEFVAL(Variant()));
@@ -861,6 +871,8 @@ void EditorInterface::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_movie_maker_enabled"), &EditorInterface::is_movie_maker_enabled);
 
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "movie_maker_enabled"), "set_movie_maker_enabled", "is_movie_maker_enabled");
+
+	ADD_SIGNAL(MethodInfo("transform_requested"));
 }
 
 void EditorInterface::create() {
