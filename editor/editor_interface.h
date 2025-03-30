@@ -124,6 +124,8 @@ public:
 	SubViewport *get_editor_viewport_2d() const;
 	SubViewport *get_editor_viewport_3d(int p_idx = 0) const;
 
+	void get_transform_gizmo_data(Dictionary data);
+	void get_transform_commited();
 	void set_simulation_started(bool p_started);
 
 	void set_main_screen_editor(const String &p_name);
