@@ -38,6 +38,7 @@
 #include "core/os/keyboard.h"
 #include "editor/debugger/editor_debugger_node.h"
 #include "editor/editor_main_screen.h"
+#include "editor/editor_interface.h"
 #include "editor/editor_node.h"
 #include "editor/editor_settings.h"
 #include "editor/editor_string_names.h"
@@ -695,6 +696,10 @@ void Node3DEditorViewport::cancel_transform() {
 	}
 
 	collision_reposition = false;
+	spatial_editor->transform_gizmo_data["motion"] = Vector3();
+	spatial_editor->transform_gizmo_data["snap"] = 0;
+	EditorInterface::get_singleton()->get_transform_gizmo_data(spatial_editor->transform_gizmo_data);
+	EditorInterface::get_singleton()->get_transform_commited();
 	finish_transform();
 	set_message(TTRC("Transform Aborted."), 3);
 }
@@ -5305,6 +5310,7 @@ void Node3DEditorViewport::commit_transform() {
 	undo_redo->commit_action();
 
 	collision_reposition = false;
+	EditorInterface::get_singleton()->get_transform_commited();
 	finish_transform();
 	set_message("");
 
@@ -5326,6 +5332,12 @@ void Node3DEditorViewport::commit_transform() {
 }
 
 void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
+	if (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_SCALE) {
+		spatial_editor->transform_gizmo_data["motion"] = p_motion;
+		spatial_editor->transform_gizmo_data["snap"] = p_snap;
+		EditorInterface::get_singleton()->get_transform_gizmo_data(spatial_editor->transform_gizmo_data);
+	}
+
 	bool local_coords = (spatial_editor->are_local_coords_enabled() && _edit.plane != TRANSFORM_VIEW);
 	bool relative_transform = spatial_editor->is_relative_transform_enabled();
 	const List<Node *> &selection = editor_selection->get_top_selected_node_list();
@@ -5352,6 +5364,10 @@ void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
 		}
 
 		if (sp->has_meta("_edit_lock_")) {
+			continue;
+		}
+
+		if (sp->has_meta("hijack_scale") && spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_SCALE) {
 			continue;
 		}
 
