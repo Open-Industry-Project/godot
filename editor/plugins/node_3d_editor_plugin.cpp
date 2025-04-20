@@ -3591,8 +3591,8 @@ bool Node3DEditorViewport::_camera_moved_externally() {
 
 void Node3DEditorViewport::_apply_camera_transform_to_cursor() {
 	// Effectively the reverse of to_camera_transform, use camera transform to set cursor position and rotation.
-	Transform3D camera_transform = camera->get_camera_transform();
-	Basis basis = camera_transform.basis;
+	const Transform3D camera_transform = camera->get_camera_transform();
+	const Basis basis = camera_transform.basis;
 
 	real_t distance;
 	if (orthogonal) {
