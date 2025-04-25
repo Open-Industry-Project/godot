@@ -1721,6 +1721,7 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 		if (!force_input_forwarding_list->is_empty()) {
 			EditorPlugin::AfterGUIInput discard = force_input_forwarding_list->forward_3d_gui_input(camera, p_event, true);
 			if (discard == EditorPlugin::AFTER_GUI_INPUT_STOP) {
+				accept_event();
 				return;
 			}
 			if (discard == EditorPlugin::AFTER_GUI_INPUT_CUSTOM) {
