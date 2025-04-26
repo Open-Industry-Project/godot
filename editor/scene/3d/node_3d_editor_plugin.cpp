@@ -738,6 +738,12 @@ void Node3DEditorViewport::cancel_transform() {
 	set_message(TTRC("Transform Aborted."), 3);
 }
 
+void Node3DEditorViewport::cancel_navigation() {
+	is_navigating = false;
+	navigation_cancelled = true;
+	cursor = previous_cursor;
+}
+
 void Node3DEditorViewport::_update_shrink() {
 	const float scaling_3d_scale = GLOBAL_GET("rendering/scaling_3d/scale");
 	const float shrink_factor = view_display_menu->get_popup()->is_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_HALF_RESOLUTION)) ? 0.5 : 1.0;
@@ -1925,9 +1931,8 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 			} break;
 			case MouseButton::RIGHT: {
 				if (b->is_pressed()) {
-					if (navigating) {
-						navigating = false;
-						cursor = previous_cursor;
+					if (is_navigating) {
+						cancel_navigation();
 						break;
 					}
 
@@ -2455,11 +2460,19 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 			}
 		}
 
-		if (!navigating && (nav_mode == NAVIGATION_PAN || nav_mode == NAVIGATION_ZOOM || nav_mode == NAVIGATION_ORBIT)) {
-			navigating = true;
+		if (m->get_button_mask() == MouseButtonMask::NONE) {
+			navigation_cancelled = false;
+		}
+
+		if (navigation_cancelled) {
+			nav_mode = NAVIGATION_NONE;
+		}
+
+		if (!is_navigating && (nav_mode == NAVIGATION_PAN || nav_mode == NAVIGATION_ZOOM || nav_mode == NAVIGATION_ORBIT)) {
+			is_navigating = true;
 			previous_cursor = cursor;
-		} else if (navigating && (nav_mode == NAVIGATION_NONE || nav_mode == NAVIGATION_LOOK)) {
-			navigating = false;
+		} else if (is_navigating && (nav_mode == NAVIGATION_NONE || nav_mode == NAVIGATION_LOOK)) {
+			is_navigating = false;
 		}
 
 		switch (nav_mode) {
@@ -2606,7 +2619,7 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 				_edit.gizmo->commit_handle(_edit.gizmo_handle, _edit.gizmo_handle_secondary, _edit.gizmo_initial_value, true);
 				_edit.gizmo = Ref<EditorNode3DGizmo>();
 			}
-			if (k->get_keycode() == Key::ESCAPE && !cursor.region_select && !navigating && !k->is_echo()) {
+			if (k->get_keycode() == Key::ESCAPE && !cursor.region_select && !is_navigating && !k->is_echo()) {
 				_clear_selected();
 				return;
 			}
@@ -2837,9 +2850,8 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 			set_freelook_active(!is_freelook_active());
 
 		} else if (k->get_keycode() == Key::ESCAPE) {
-			if (navigating) {
-				navigating = false;
-				cursor = previous_cursor;
+			if (is_navigating) {
+				cancel_navigation();
 				return;
 			}
 			set_freelook_active(false);
