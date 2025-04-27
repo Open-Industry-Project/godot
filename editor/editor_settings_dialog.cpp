@@ -313,7 +313,7 @@ void EditorSettingsDialog::_update_icons() {
 }
 
 void EditorSettingsDialog::_event_config_confirmed() {
-	Ref<InputEventKey> k = shortcut_editor->get_event();
+	Ref<InputEvent> k = shortcut_editor->get_event();
 	if (k.is_null()) {
 		return;
 	}
@@ -965,7 +965,7 @@ EditorSettingsDialog::EditorSettingsDialog() {
 	shortcut_search_by_event = memnew(EventListenerLineEdit);
 	shortcut_search_by_event->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	shortcut_search_by_event->set_stretch_ratio(0.75);
-	shortcut_search_by_event->set_allowed_input_types(INPUT_KEY);
+	shortcut_search_by_event->set_allowed_input_types(INPUT_KEY | INPUT_MOUSE_BUTTON);
 	shortcut_search_by_event->connect("event_changed", callable_mp(this, &EditorSettingsDialog::_filter_shortcuts_by_event));
 	shortcut_search_by_event->connect(SceneStringName(focus_entered), callable_mp((AcceptDialog *)this, &AcceptDialog::set_close_on_escape).bind(false));
 	shortcut_search_by_event->connect(SceneStringName(focus_exited), callable_mp((AcceptDialog *)this, &AcceptDialog::set_close_on_escape).bind(true));
@@ -995,7 +995,7 @@ EditorSettingsDialog::EditorSettingsDialog() {
 	// Adding event dialog
 	shortcut_editor = memnew(InputEventConfigurationDialog);
 	shortcut_editor->connect(SceneStringName(confirmed), callable_mp(this, &EditorSettingsDialog::_event_config_confirmed));
-	shortcut_editor->set_allowed_input_types(INPUT_KEY);
+	shortcut_editor->set_allowed_input_types(INPUT_KEY | INPUT_MOUSE_BUTTON);
 	add_child(shortcut_editor);
 
 	set_hide_on_ok(true);
