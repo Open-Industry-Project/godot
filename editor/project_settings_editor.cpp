@@ -104,6 +104,13 @@ void ProjectSettingsEditor::init_autoloads() {
 
 void ProjectSettingsEditor::_setting_edited(const String &p_name) {
 	queue_save();
+
+	// Get the current section (category) of the property.
+	String current_section = general_settings_inspector->get_current_section();
+
+	if (current_section.begins_with("physics")) {
+		_editor_restart_request(); // Show the restart popup.
+	}
 }
 
 void ProjectSettingsEditor::_update_advanced(bool p_is_advanced) {
