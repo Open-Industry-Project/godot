@@ -47,6 +47,7 @@
 #include "scene/gui/popup_menu.h"
 #include "scene/gui/tab_bar.h"
 #include "scene/gui/texture_rect.h"
+#include "editor/editor_interface.h"
 
 void EditorSceneTabs::_notification(int p_what) {
 	switch (p_what) {
@@ -226,6 +227,26 @@ void EditorSceneTabs::_custom_menu_option(int p_option) {
 	}
 }
 
+void EditorSceneTabs::check_current_tab_modification() {
+    // Get the currently active tab
+    int current_tab = EditorNode::get_editor_data().get_edited_scene();
+    if (current_tab < 0) {
+        return;
+    }
+
+    // Check if the current tab is unsaved
+    bool unsaved = EditorUndoRedoManager::get_singleton()->is_history_unsaved(EditorNode::get_editor_data().get_scene_history_id(current_tab));
+
+    // Static variable to track the last known state for the current tab
+    static bool last_unsaved_state = false;
+
+    // Emit the signal only if the state has changed
+    if (last_unsaved_state != unsaved) {
+        last_unsaved_state = unsaved;
+        EditorInterface::get_singleton()->scene_modification_state_changed(unsaved);
+    }
+}
+
 void EditorSceneTabs::update_scene_tabs() {
 	static bool menu_initialized = false;
 	tab_preview_panel->hide();
@@ -304,6 +325,7 @@ void EditorSceneTabs::_update_tab_titles() {
 	}
 
 	_scene_tabs_resized();
+	check_current_tab_modification(); // Check for modifications
 }
 
 void EditorSceneTabs::_scene_tabs_resized() {

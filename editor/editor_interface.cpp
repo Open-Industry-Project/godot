@@ -368,6 +368,16 @@ bool EditorInterface::is_plugin_enabled(const String &p_plugin) const {
 	return EditorNode::get_singleton()->is_addon_plugin_enabled(p_plugin);
 }
 
+void EditorInterface::scene_modification_state_changed(bool modified) {
+    emit_signal("scene_modification_state_changed", modified);
+}
+
+bool EditorInterface::is_scene_modified() const {
+    EditorSceneTabs *scene_tabs = EditorNode::get_singleton()->get_scene_tabs(); // Use the getter
+    int current_tab = scene_tabs->get_current_tab();
+    return EditorUndoRedoManager::get_singleton()->is_history_unsaved(EditorNode::get_editor_data().get_scene_history_id(current_tab));
+}
+
 // Editor GUI.
 
 Ref<Theme> EditorInterface::get_editor_theme() const {
@@ -778,7 +788,9 @@ void EditorInterface::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("restart_editor", "save"), &EditorInterface::restart_editor, DEFVAL(true));
 
 	// Editor tools.
-
+	ClassDB::bind_method(D_METHOD("is_scene_modified"), &EditorInterface::is_scene_modified);
+    ADD_SIGNAL(MethodInfo("scene_modification_state_changed", PropertyInfo(Variant::BOOL, "modified")));
+	
 	ClassDB::bind_method(D_METHOD("get_command_palette"), &EditorInterface::get_command_palette);
 	ClassDB::bind_method(D_METHOD("get_resource_filesystem"), &EditorInterface::get_resource_file_system);
 	ClassDB::bind_method(D_METHOD("get_editor_paths"), &EditorInterface::get_editor_paths);

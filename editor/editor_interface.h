@@ -181,6 +181,11 @@ public:
 	void mark_scene_as_saved();
 	void save_all_scenes();
 
+	// Signal for scene modification state changes
+	void scene_modification_state_changed(bool modified);
+	// Method to check if the current scene is modified
+	bool is_scene_modified() const;
+
 	// Scene playback.
 
 	void play_main_scene();

@@ -766,6 +766,8 @@ public:
 	EditorSelection *get_editor_selection() { return editor_selection; }
 	EditorSelectionHistory *get_editor_selection_history() { return &editor_history; }
 
+	EditorSceneTabs *get_scene_tabs() { return scene_tabs; }
+
 	ProjectSettingsEditor *get_project_settings() { return project_settings_editor; }
 
 	void set_simulation_started(bool p_started) { simulation_started = p_started; }
