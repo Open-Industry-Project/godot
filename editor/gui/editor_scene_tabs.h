@@ -76,6 +76,8 @@ private:
 	void _scene_tab_input(const Ref<InputEvent> &p_input);
 	void _scene_tabs_resized();
 
+	void check_current_tab_modification();
+
 	void _update_tab_titles();
 	void _reposition_active_tab(int p_to_index);
 	void _update_context_menu();
