@@ -569,6 +569,34 @@ void ProjectDialog::ok_pressed() {
 
 		String defaultPath = OS::get_singleton()->get_executable_path().get_base_dir() + "/default_project";
 
+		Ref<DirAccess> d = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
+		if (!d->dir_exists(defaultPath)) {
+			// Remove existing dialog and create a new one each time
+			if (dialog_error != nullptr) {
+				memdelete(dialog_error);
+			}
+			
+			dialog_error = memnew(AcceptDialog);
+			dialog_error->set_title(TTRC("Error"));
+			add_child(dialog_error);
+			
+			// Show message without the URL to avoid duplication
+			dialog_error->set_text(TTRC("Default project template not found."));
+			
+			// Add a button to open the URL
+			String url = "https://github.com/Open-Industry-Project/Open-Industry-Project/releases";
+			dialog_error->add_button(TTRC("Open Download Page"), true, "open_url");
+			
+			// Store the URL as metadata
+			dialog_error->set_meta("download_url", url);
+			
+			// Connect the signal for this instance
+			dialog_error->connect("custom_action", callable_mp(this, &ProjectDialog::_on_dialog_custom_action));
+			
+			dialog_error->popup_centered();
+			return;
+		}
+
 		std::filesystem::copy(defaultPath.utf8().get_data(), path.utf8().get_data(), std::filesystem::copy_options::recursive);
 	}
 
@@ -953,6 +981,8 @@ void ProjectDialog::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("project_created"));
 	ADD_SIGNAL(MethodInfo("project_duplicated"));
 	ADD_SIGNAL(MethodInfo("projects_updated"));
+	
+	ClassDB::bind_method(D_METHOD("_on_dialog_custom_action", "action"), &ProjectDialog::_on_dialog_custom_action);
 }
 
 ProjectDialog::ProjectDialog() {
@@ -1181,6 +1211,13 @@ ProjectDialog::ProjectDialog() {
 
 	set_hide_on_ok(false);
 
-	dialog_error = memnew(AcceptDialog);
-	add_child(dialog_error);
+	// Initialize dialog_error to nullptr
+	dialog_error = nullptr;
+}
+
+void ProjectDialog::_on_dialog_custom_action(const String &p_action) {
+	if (p_action == "open_url") {
+		String url = dialog_error->get_meta("download_url");
+		OS::get_singleton()->shell_open(url);
+	}
 }

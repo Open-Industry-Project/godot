@@ -144,6 +144,7 @@ private:
 	void _reset_name();
 	void _renderer_selected();
 	void _nonempty_confirmation_ok_pressed();
+	void _on_dialog_custom_action(const String &p_action);
 
 	void ok_pressed() override;
 
