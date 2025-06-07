@@ -2252,6 +2252,11 @@ void EditorNode::_find_node_types(Node *p_node, int &count_2d, int &count_3d) {
 }
 
 void EditorNode::_save_scene_with_preview(String p_file, int p_idx) {
+	if (simulation_started) {
+		show_accept(TTR("Scene can't be saved while the simulation is started."), TTR("OK"));
+		return;
+	}
+
 	save_scene_progress = memnew(EditorProgress("save", TTR("Saving Scene"), 4));
 
 	if (editor_data.get_edited_scene_root() != nullptr) {
@@ -2592,6 +2597,10 @@ void EditorNode::save_before_run() {
 }
 
 void EditorNode::try_autosave() {
+	if (simulation_started) {
+		return; // Early return without showing dialog since this is autosave
+	}
+
 	if (!bool(EDITOR_GET("run/auto_save/save_before_running"))) {
 		return;
 	}
@@ -2612,6 +2621,11 @@ void EditorNode::restart_editor(bool p_goto_project_manager) {
 }
 
 void EditorNode::_save_all_scenes() {
+	if (simulation_started) {
+		show_accept(TTR("Scenes can't be saved while the simulation is started."), TTR("OK"));
+		return;
+	}
+
 	scenes_to_save_as.clear(); // In case saving was canceled before.
 	for (int i = 0; i < editor_data.get_edited_scene_count(); i++) {
 		if (!is_scene_unsaved(i)) {
@@ -3481,6 +3495,11 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 		case SCENE_MULTI_SAVE_AS_SCENE:
 		case SCENE_SAVE_AS_SCENE:
 		case EditorSceneTabs::SCENE_SAVE_AS_SCENE: {
+			if (simulation_started) {
+				show_accept(TTR("Scene can't be saved while the simulation is started."), TTR("OK"));
+				break;
+			}
+
 			int scene_idx = -1;
 			if (p_option == SCENE_TAB_CLOSE) {
 				scene_idx = tab_closing_idx;
@@ -3488,6 +3507,7 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 				scene_idx = scene_tabs->get_option_tab();
 				current_menu_option = SCENE_TAB_SAVE_SCENE;
 			}
+
 			Node *scene = editor_data.get_edited_scene_root(scene_idx);
 			if (!scene) {
 				if (p_option == SCENE_SAVE_SCENE) {
