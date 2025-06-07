@@ -1518,6 +1518,11 @@ void EditorNode::edit_resource(const Ref<Resource> &p_resource) {
 }
 
 void EditorNode::save_resource_in_path(const Ref<Resource> &p_resource, const String &p_path) {
+	if (simulation_started) {
+		show_accept(TTR("Resource can't be saved while the simulation is started."), TTR("OK"));
+		return;
+	}
+
 	editor_data.apply_changes_in_editors();
 
 	if (saving_resources_in_path.has(p_resource)) {
@@ -1580,6 +1585,11 @@ void EditorNode::save_resource(const Ref<Resource> &p_resource) {
 }
 
 void EditorNode::save_resource_as(const Ref<Resource> &p_resource, const String &p_at_path) {
+	if (simulation_started) {
+		show_accept(TTR("Resource can't be saved while the simulation is started."), TTR("OK"));
+		return;
+	}
+
 	{
 		String path = p_resource->get_path();
 		if (!path.is_resource_file()) {
@@ -1881,6 +1891,11 @@ bool EditorNode::_validate_scene_recursive(const String &p_filename, Node *p_nod
 }
 
 int EditorNode::_save_external_resources(bool p_also_save_external_data) {
+	if (simulation_started) {
+		show_accept(TTR("External resources can't be saved while the simulation is started."), TTR("OK"));
+		return 0;
+	}
+
 	// Save external resources and its subresources if any was modified.
 
 	int flg = 0;
@@ -2116,6 +2131,10 @@ void EditorNode::save_before_run() {
 }
 
 void EditorNode::try_autosave() {
+	if (simulation_started) {
+		return; // Early return without showing dialog since this is autosave
+	}
+
 	if (!bool(EDITOR_GET("run/auto_save/save_before_running"))) {
 		return;
 	}
@@ -2136,6 +2155,11 @@ void EditorNode::restart_editor(bool p_goto_project_manager) {
 }
 
 void EditorNode::_save_all_scenes() {
+	if (simulation_started) {
+		show_accept(TTR("Scenes can't be saved while the simulation is started."), TTR("OK"));
+		return;
+	}
+
 	scenes_to_save_as.clear(); // In case saving was canceled before.
 	for (int i = 0; i < editor_data.get_edited_scene_count(); i++) {
 		if (!_is_scene_unsaved(i)) {
@@ -2960,6 +2984,11 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 		}
 		case SCENE_MULTI_SAVE_AS_SCENE:
 		case SCENE_SAVE_AS_SCENE: {
+			if (simulation_started) {
+				show_accept(TTR("Scene can't be saved while the simulation is started."), TTR("OK"));
+				break;
+			}
+
 			int scene_idx = (p_option == SCENE_SAVE_SCENE || p_option == SCENE_SAVE_AS_SCENE || p_option == SCENE_MULTI_SAVE_AS_SCENE) ? -1 : tab_closing_idx;
 
 			Node *scene = editor_data.get_edited_scene_root(scene_idx);
