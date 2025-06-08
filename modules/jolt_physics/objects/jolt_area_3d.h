@@ -102,6 +102,10 @@ private:
 
 	Vector3 gravity_vector = Vector3(0, -1, 0);
 
+	Vector3 conveyor_belt_linear_velocity;
+	Vector3 conveyor_belt_angular_velocity;
+	float conveyor_belt_strength = 10.0f;
+
 	Callable body_monitor_callback;
 	Callable area_monitor_callback;
 
@@ -221,6 +225,10 @@ public:
 	void set_gravity_vector(const Vector3 &p_vector);
 
 	Vector3 compute_gravity(const Vector3 &p_position) const;
+
+	Vector3 get_conveyor_belt_linear_velocity() const { return conveyor_belt_linear_velocity; }
+	Vector3 get_conveyor_belt_angular_velocity() const { return conveyor_belt_angular_velocity; }
+	float get_conveyor_belt_strength() const { return conveyor_belt_strength; }
 
 	void body_shape_entered(const JPH::BodyID &p_body_id, const JPH::SubShapeID &p_other_shape_id, const JPH::SubShapeID &p_self_shape_id);
 	bool body_shape_exited(const JPH::BodyID &p_body_id, const JPH::SubShapeID &p_other_shape_id, const JPH::SubShapeID &p_self_shape_id);

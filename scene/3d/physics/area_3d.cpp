@@ -188,6 +188,33 @@ void Area3D::_initialize_wind() {
 	PhysicsServer3D::get_singleton()->area_set_param(get_rid(), PhysicsServer3D::AREA_PARAM_WIND_FORCE_MAGNITUDE, temp_magnitude);
 }
 
+void Area3D::set_conveyor_belt_linear_velocity(const Vector3 &p_vel) {
+	conveyor_belt_linear_velocity = p_vel;
+	PhysicsServer3D::get_singleton()->area_set_param(get_rid(), PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_LINEAR_VELOCITY, conveyor_belt_linear_velocity);
+}
+
+void Area3D::set_conveyor_belt_angular_velocity(const Vector3 &p_vel) {
+	conveyor_belt_angular_velocity = p_vel;
+	PhysicsServer3D::get_singleton()->area_set_param(get_rid(), PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_ANGULAR_VELOCITY, conveyor_belt_angular_velocity);
+}
+
+Vector3 Area3D::get_conveyor_belt_linear_velocity() const {
+	return conveyor_belt_linear_velocity;
+}
+
+Vector3 Area3D::get_conveyor_belt_angular_velocity() const {
+	return conveyor_belt_angular_velocity;
+}
+
+void Area3D::set_conveyor_belt_strength(real_t p_strength) {
+	conveyor_belt_strength = p_strength;
+	PhysicsServer3D::get_singleton()->area_set_param(get_rid(), PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_STRENGTH, conveyor_belt_strength);
+}
+
+real_t Area3D::get_conveyor_belt_strength() const {
+	return conveyor_belt_strength;
+}
+
 void Area3D::_body_enter_tree(ObjectID p_id) {
 	Object *obj = ObjectDB::get_instance(p_id);
 	Node *node = Object::cast_to<Node>(obj);
@@ -724,6 +751,15 @@ void Area3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_wind_source_path", "wind_source_path"), &Area3D::set_wind_source_path);
 	ClassDB::bind_method(D_METHOD("get_wind_source_path"), &Area3D::get_wind_source_path);
 
+	ClassDB::bind_method(D_METHOD("set_conveyor_belt_linear_velocity", "vel"), &Area3D::set_conveyor_belt_linear_velocity);
+	ClassDB::bind_method(D_METHOD("get_conveyor_belt_linear_velocity"), &Area3D::get_conveyor_belt_linear_velocity);
+
+	ClassDB::bind_method(D_METHOD("set_conveyor_belt_angular_velocity", "vel"), &Area3D::set_conveyor_belt_angular_velocity);
+	ClassDB::bind_method(D_METHOD("get_conveyor_belt_angular_velocity"), &Area3D::get_conveyor_belt_angular_velocity);
+
+	ClassDB::bind_method(D_METHOD("set_conveyor_belt_strength", "strength"), &Area3D::set_conveyor_belt_strength);
+	ClassDB::bind_method(D_METHOD("get_conveyor_belt_strength"), &Area3D::get_conveyor_belt_strength);
+
 	ClassDB::bind_method(D_METHOD("set_monitorable", "enable"), &Area3D::set_monitorable);
 	ClassDB::bind_method(D_METHOD("is_monitorable"), &Area3D::is_monitorable);
 
@@ -791,6 +827,11 @@ void Area3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "wind_force_magnitude", PROPERTY_HINT_RANGE, "0,10,0.001,or_greater"), "set_wind_force_magnitude", "get_wind_force_magnitude");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "wind_attenuation_factor", PROPERTY_HINT_RANGE, "0.0,3.0,0.001,or_greater"), "set_wind_attenuation_factor", "get_wind_attenuation_factor");
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "wind_source_path", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "Node3D"), "set_wind_source_path", "get_wind_source_path");
+
+	ADD_GROUP("Conveyor Belt", "conveyor_belt_");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "conveyor_belt_linear_velocity", PROPERTY_HINT_NONE, "suffix:m/s"), "set_conveyor_belt_linear_velocity", "get_conveyor_belt_linear_velocity");
+	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "conveyor_belt_angular_velocity", PROPERTY_HINT_NONE, U"radians_as_degrees,suffix:\u00B0/s"), "set_conveyor_belt_angular_velocity", "get_conveyor_belt_angular_velocity");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "conveyor_belt_strength", PROPERTY_HINT_RANGE, "0.0,100.0,0.1,or_greater"), "set_conveyor_belt_strength", "get_conveyor_belt_strength");
 
 	ADD_GROUP("Audio Bus", "audio_bus_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "audio_bus_override"), "set_audio_bus_override", "is_overriding_audio_bus");

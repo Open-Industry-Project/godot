@@ -169,6 +169,7 @@ void JoltBody3D::_dequeue_call_queries() {
 
 void JoltBody3D::_integrate_forces(float p_step, JPH::Body &p_jolt_body) {
 	_update_gravity(p_jolt_body);
+	_update_conveyor_belt_forces(p_step, p_jolt_body);
 
 	if (!custom_integrator) {
 		JPH::MotionProperties &motion_properties = *p_jolt_body.GetMotionPropertiesUnchecked();
@@ -191,6 +192,47 @@ void JoltBody3D::_integrate_forces(float p_step, JPH::Body &p_jolt_body) {
 
 		p_jolt_body.AddForce(to_jolt(constant_force));
 		p_jolt_body.AddTorque(to_jolt(constant_torque));
+	}
+}
+
+void JoltBody3D::_update_conveyor_belt_forces(float p_step, JPH::Body &p_jolt_body) {
+	// Only apply conveyor belt forces to rigid bodies
+	if (!is_rigid()) {
+		return;
+	}
+
+	Vector3 total_conveyor_belt_force;
+	Vector3 total_conveyor_belt_torque;
+
+	for (const JoltArea3D *area : areas) {
+		Vector3 area_linear_velocity = area->get_conveyor_belt_linear_velocity();
+		Vector3 area_angular_velocity = area->get_conveyor_belt_angular_velocity();
+		float conveyor_belt_strength = area->get_conveyor_belt_strength();
+
+		// Apply forces if strength is set, regardless of target velocity
+		if (conveyor_belt_strength > 0.0f) {
+			// Get current body velocity
+			Vector3 current_linear_velocity = to_godot(p_jolt_body.GetLinearVelocity());
+			Vector3 current_angular_velocity = to_godot(p_jolt_body.GetAngularVelocity());
+
+			// Calculate the velocity difference (what the conveyor belt wants to add)
+			Vector3 linear_velocity_diff = area_linear_velocity - current_linear_velocity;
+			Vector3 angular_velocity_diff = area_angular_velocity - current_angular_velocity;
+
+			// Apply conveyor belt force proportional to velocity difference
+			// This simulates friction - the force tries to match the conveyor belt speed
+			// When target velocity is zero, this acts as pure damping/friction
+			total_conveyor_belt_force += linear_velocity_diff * conveyor_belt_strength * get_mass();
+			total_conveyor_belt_torque += angular_velocity_diff * conveyor_belt_strength;
+		}
+	}
+
+	// Apply the accumulated conveyor belt forces
+	if (total_conveyor_belt_force != Vector3()) {
+		p_jolt_body.AddForce(to_jolt(total_conveyor_belt_force));
+	}
+	if (total_conveyor_belt_torque != Vector3()) {
+		p_jolt_body.AddTorque(to_jolt(total_conveyor_belt_torque));
 	}
 }
 

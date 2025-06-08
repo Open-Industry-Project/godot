@@ -63,6 +63,10 @@ private:
 	real_t wind_attenuation_factor = 0.0;
 	NodePath wind_source_path;
 
+	Vector3 conveyor_belt_linear_velocity;
+	Vector3 conveyor_belt_angular_velocity;
+	real_t conveyor_belt_strength = 10.0;
+
 	bool monitoring = false;
 	bool monitorable = false;
 	bool locked = false;
@@ -191,6 +195,15 @@ public:
 
 	void set_wind_source_path(const NodePath &p_wind_source_path);
 	const NodePath &get_wind_source_path() const;
+
+	void set_conveyor_belt_linear_velocity(const Vector3 &p_vel);
+	Vector3 get_conveyor_belt_linear_velocity() const;
+
+	void set_conveyor_belt_angular_velocity(const Vector3 &p_vel);
+	Vector3 get_conveyor_belt_angular_velocity() const;
+
+	void set_conveyor_belt_strength(real_t p_strength);
+	real_t get_conveyor_belt_strength() const;
 
 	void set_monitoring(bool p_enable);
 	bool is_monitoring() const;

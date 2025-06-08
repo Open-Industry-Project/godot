@@ -124,6 +124,7 @@ private:
 
 	void _update_mass_properties();
 	void _update_gravity(JPH::Body &p_jolt_body);
+	void _update_conveyor_belt_forces(float p_step, JPH::Body &p_jolt_body);
 	void _update_damp();
 	void _update_kinematic_transform();
 	void _update_group_filter();

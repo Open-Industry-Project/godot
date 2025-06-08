@@ -352,6 +352,15 @@ Variant JoltArea3D::get_param(PhysicsServer3D::AreaParameter p_param) const {
 		case PhysicsServer3D::AREA_PARAM_WIND_ATTENUATION_FACTOR: {
 			return AREA_DEFAULT_WIND_ATTENUATION;
 		}
+		case PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_LINEAR_VELOCITY: {
+			return conveyor_belt_linear_velocity;
+		}
+		case PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_ANGULAR_VELOCITY: {
+			return conveyor_belt_angular_velocity;
+		}
+		case PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_STRENGTH: {
+			return conveyor_belt_strength;
+		}
 		default: {
 			ERR_FAIL_V_MSG(Variant(), vformat("Unhandled area parameter: '%d'. This should not happen. Please report this.", p_param));
 		}
@@ -409,6 +418,15 @@ void JoltArea3D::set_param(PhysicsServer3D::AreaParameter p_param, const Variant
 			if (!Math::is_equal_approx((double)p_value, AREA_DEFAULT_WIND_ATTENUATION)) {
 				WARN_PRINT(vformat("Invalid wind attenuation for '%s'. Area wind attenuation is not supported when using Jolt Physics. Any such value will be ignored.", to_string()));
 			}
+		} break;
+		case PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_LINEAR_VELOCITY: {
+			conveyor_belt_linear_velocity = p_value;
+		} break;
+		case PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_ANGULAR_VELOCITY: {
+			conveyor_belt_angular_velocity = p_value;
+		} break;
+		case PhysicsServer3D::AREA_PARAM_CONVEYOR_BELT_STRENGTH: {
+			conveyor_belt_strength = p_value;
 		} break;
 		default: {
 			ERR_FAIL_MSG(vformat("Unhandled area parameter: '%d'. This should not happen. Please report this.", p_param));
