@@ -41,6 +41,16 @@
 #include <Jolt/Physics/SoftBody/SoftBodyManifold.h>
 
 void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
+	// Check for conveyor ghost collisions first
+	if (_is_conveyor_ghost_collision(p_body1, p_body2, p_manifold)) {
+		// Disable this collision entirely
+		p_settings.mInvMassScale1 = 0.0f;
+		p_settings.mInvMassScale2 = 0.0f;
+		p_settings.mInvInertiaScale1 = 0.0f;
+		p_settings.mInvInertiaScale2 = 0.0f;
+		return;
+	}
+
 	_try_override_collision_response(p_body1, p_body2, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
@@ -52,6 +62,16 @@ void JoltContactListener3D::OnContactAdded(const JPH::Body &p_body1, const JPH::
 }
 
 void JoltContactListener3D::OnContactPersisted(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold, JPH::ContactSettings &p_settings) {
+	// Check for conveyor ghost collisions first
+	if (_is_conveyor_ghost_collision(p_body1, p_body2, p_manifold)) {
+		// Disable this collision entirely
+		p_settings.mInvMassScale1 = 0.0f;
+		p_settings.mInvMassScale2 = 0.0f;
+		p_settings.mInvInertiaScale1 = 0.0f;
+		p_settings.mInvInertiaScale2 = 0.0f;
+		return;
+	}
+
 	_try_override_collision_response(p_body1, p_body2, p_settings);
 	_try_apply_surface_velocities(p_body1, p_body2, p_settings);
 	_try_add_contacts(p_body1, p_body2, p_manifold, p_settings);
@@ -549,8 +569,58 @@ void JoltContactListener3D::_clear_area_soft_body_overlaps() {
 	for (const JPH::SubShapeIDPair &shape_pair : area_soft_body_overlaps) {
 		area_exits.insert(shape_pair);
 	}
-
 	area_soft_body_overlaps.clear();
+}
+
+bool JoltContactListener3D::_is_conveyor_ghost_collision(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold) {
+	// Skip if either body is a sensor
+	if (p_body1.IsSensor() || p_body2.IsSensor()) {
+		return false;
+	}
+
+	// Only check when one body is dynamic and the other is static
+	const bool is_dynamic1 = p_body1.IsDynamic();
+	const bool is_dynamic2 = p_body2.IsDynamic();
+
+	if (is_dynamic1 == is_dynamic2) {
+		return false;
+	}
+
+	// Get the bodies
+	const JoltBody3D *body1 = reinterpret_cast<JoltBody3D *>(p_body1.GetUserData());
+	const JoltBody3D *body2 = reinterpret_cast<JoltBody3D *>(p_body2.GetUserData());
+
+	if (unlikely(!body1 || !body2)) {
+		return false;
+	}
+
+	// Identify which body is static (potential conveyor) and which is dynamic
+	const JoltBody3D *static_body = is_dynamic1 ? body2 : body1;
+	const JoltBody3D *dynamic_body = is_dynamic1 ? body1 : body2;
+
+	if (!dynamic_body->is_ghost_collision_filtering_enabled()) {
+		return false;
+	}
+
+	const Vector3 linear_surface_velocity = static_body->get_linear_surface_velocity();
+	const Vector3 angular_surface_velocity = static_body->get_angular_surface_velocity();
+
+	if (linear_surface_velocity.length_squared() < 0.001f && angular_surface_velocity.length_squared() < 0.001f) {
+		return false;
+	}
+
+	// Check contact normal direction - filter sideways collisions, keep top surface contacts
+	const JPH::Vec3 world_normal = p_manifold.mWorldSpaceNormal;
+	const float up_dot = is_dynamic1 ? -world_normal.GetY() : world_normal.GetY();
+
+	const float threshold_angle = dynamic_body->get_ghost_collision_threshold_angle();
+	const float threshold_dot = cos(Math::deg_to_rad(threshold_angle));
+
+	if (up_dot > threshold_dot) {
+		return false;
+	}
+
+	return true;
 }
 
 void JoltContactListener3D::pre_step() {

@@ -122,6 +122,8 @@ class JoltContactListener3D final
 	void _evaluate_area_overlap(const JoltArea3D &p_area, const JoltBody3D &p_body, const JPH::SubShapeIDPair &p_shape_pair);
 	void _evaluate_area_overlap(const JoltArea3D &p_area, const JoltSoftBody3D &p_body, const JPH::SubShapeIDPair &p_shape_pair);
 
+	bool _is_conveyor_ghost_collision(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold);
+
 	void _flush_contacts();
 	void _flush_area_enters();
 	void _flush_area_exits();

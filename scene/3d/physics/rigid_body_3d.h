@@ -86,6 +86,9 @@ private:
 
 	bool custom_integrator = false;
 
+	bool ghost_collision_filtering_enabled = false;
+	real_t ghost_collision_threshold_angle = Math::deg_to_rad(45.0); // radians (displayed as degrees)
+
 	struct ShapePair {
 		int body_shape = 0;
 		int local_shape = 0;
@@ -233,6 +236,12 @@ public:
 
 	void set_constant_torque(const Vector3 &p_torque);
 	Vector3 get_constant_torque() const;
+
+	void set_ghost_collision_filtering_enabled(bool p_enabled);
+	bool is_ghost_collision_filtering_enabled() const;
+
+	void set_ghost_collision_threshold_angle(real_t p_angle);
+	real_t get_ghost_collision_threshold_angle() const;
 
 	virtual PackedStringArray get_configuration_warnings() const override;
 

@@ -103,6 +103,8 @@ private:
 	bool custom_center_of_mass = false;
 	bool custom_integrator = false;
 	bool has_point_gravity = false;
+	bool ghost_collision_filtering_enabled = false;
+	float ghost_collision_threshold_angle = 45.0f; // Angle threshold in degrees for ghost collision filtering (0-90°)
 
 	virtual JPH::BroadPhaseLayer _get_broad_phase_layer() const override;
 	virtual JPH::ObjectLayer _get_object_layer() const override;
@@ -302,6 +304,12 @@ public:
 	bool is_axis_locked(PhysicsServer3D::BodyAxis p_axis) const;
 	void set_axis_lock(PhysicsServer3D::BodyAxis p_axis, bool p_enabled);
 	bool are_axes_locked() const { return locked_axes != 0; }
+
+	bool is_ghost_collision_filtering_enabled() const { return ghost_collision_filtering_enabled; }
+	void set_ghost_collision_filtering_enabled(bool p_enabled) { ghost_collision_filtering_enabled = p_enabled; }
+
+	float get_ghost_collision_threshold_angle() const { return ghost_collision_threshold_angle; }
+	void set_ghost_collision_threshold_angle(float p_angle) { ghost_collision_threshold_angle = p_angle; }
 
 	virtual bool can_interact_with(const JoltBody3D &p_other) const override;
 	virtual bool can_interact_with(const JoltSoftBody3D &p_other) const override;

@@ -612,6 +612,9 @@ Variant JoltBody3D::get_param(PhysicsServer3D::BodyParameter p_param) const {
 		case PhysicsServer3D::BODY_PARAM_ANGULAR_DAMP: {
 			return get_angular_damp();
 		}
+		case PhysicsServer3D::BODY_PARAM_MAX: {
+			ERR_FAIL_V_MSG(Variant(), "Ghost collision parameters are not readable via body_get_param()");
+		}
 		default: {
 			ERR_FAIL_V_MSG(Variant(), vformat("Unhandled body parameter: '%d'. This should not happen. Please report this.", p_param));
 		}
@@ -649,6 +652,12 @@ void JoltBody3D::set_param(PhysicsServer3D::BodyParameter p_param, const Variant
 		} break;
 		case PhysicsServer3D::BODY_PARAM_ANGULAR_DAMP: {
 			set_angular_damp(p_value);
+		} break;
+		case PhysicsServer3D::BODY_PARAM_MAX: {
+			ERR_FAIL_COND(p_value.get_type() != Variant::VECTOR2);
+			Vector2 ghost_settings = p_value;
+			set_ghost_collision_filtering_enabled(ghost_settings.x > 0.5f);
+			set_ghost_collision_threshold_angle(ghost_settings.y);
 		} break;
 		default: {
 			ERR_FAIL_MSG(vformat("Unhandled body parameter: '%d'. This should not happen. Please report this.", p_param));
