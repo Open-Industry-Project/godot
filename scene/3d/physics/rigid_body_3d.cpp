@@ -678,6 +678,28 @@ PackedStringArray RigidBody3D::get_configuration_warnings() const {
 	return warnings;
 }
 
+void RigidBody3D::set_ghost_collision_filtering_enabled(bool p_enabled) {
+	ghost_collision_filtering_enabled = p_enabled;
+	real_t angle_degrees = Math::rad_to_deg(ghost_collision_threshold_angle);
+	Vector2 ghost_settings(p_enabled ? 1.0f : 0.0f, angle_degrees);
+	PhysicsServer3D::get_singleton()->body_set_param(get_rid(), PhysicsServer3D::BODY_PARAM_MAX, ghost_settings);
+}
+
+bool RigidBody3D::is_ghost_collision_filtering_enabled() const {
+	return ghost_collision_filtering_enabled;
+}
+
+void RigidBody3D::set_ghost_collision_threshold_angle(real_t p_angle_radians) {
+	ghost_collision_threshold_angle = CLAMP(p_angle_radians, 0.0, Math::deg_to_rad(90.0));
+	real_t angle_degrees = Math::rad_to_deg(ghost_collision_threshold_angle);
+	Vector2 ghost_settings(ghost_collision_filtering_enabled ? 1.0f : 0.0f, angle_degrees);
+	PhysicsServer3D::get_singleton()->body_set_param(get_rid(), PhysicsServer3D::BODY_PARAM_MAX, ghost_settings);
+}
+
+real_t RigidBody3D::get_ghost_collision_threshold_angle() const {
+	return ghost_collision_threshold_angle;
+}
+
 void RigidBody3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_mass", "mass"), &RigidBody3D::set_mass);
 	ClassDB::bind_method(D_METHOD("get_mass"), &RigidBody3D::get_mass);
@@ -767,6 +789,11 @@ void RigidBody3D::_bind_methods() {
 
 	ClassDB::bind_method(D_METHOD("get_colliding_bodies"), &RigidBody3D::get_colliding_bodies);
 
+	ClassDB::bind_method(D_METHOD("set_ghost_collision_filtering_enabled", "enabled"), &RigidBody3D::set_ghost_collision_filtering_enabled);
+	ClassDB::bind_method(D_METHOD("is_ghost_collision_filtering_enabled"), &RigidBody3D::is_ghost_collision_filtering_enabled);
+	ClassDB::bind_method(D_METHOD("set_ghost_collision_threshold_angle", "angle"), &RigidBody3D::set_ghost_collision_threshold_angle);
+	ClassDB::bind_method(D_METHOD("get_ghost_collision_threshold_angle"), &RigidBody3D::get_ghost_collision_threshold_angle);
+
 	GDVIRTUAL_BIND(_integrate_forces, "state");
 
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "mass", PROPERTY_HINT_RANGE, "0.001,1000,0.001,or_greater,exp,suffix:kg"), "set_mass", "get_mass");
@@ -787,6 +814,11 @@ void RigidBody3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "continuous_cd"), "set_use_continuous_collision_detection", "is_using_continuous_collision_detection");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "contact_monitor"), "set_contact_monitor", "is_contact_monitor_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "max_contacts_reported", PROPERTY_HINT_RANGE, "0,64,1,or_greater"), "set_max_contacts_reported", "get_max_contacts_reported");
+
+	ADD_GROUP("Ghost Collision Filtering", "ghost_collision_");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ghost_collision_filtering_enabled"), "set_ghost_collision_filtering_enabled", "is_ghost_collision_filtering_enabled");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ghost_collision_threshold_angle", PROPERTY_HINT_RANGE, "0,90,0.1,radians_as_degrees"), "set_ghost_collision_threshold_angle", "get_ghost_collision_threshold_angle");
+
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "linear_velocity", PROPERTY_HINT_NONE, "suffix:m/s"), "set_linear_velocity", "get_linear_velocity");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "linear_damp_mode", PROPERTY_HINT_ENUM, "Combine,Replace"), "set_linear_damp_mode", "get_linear_damp_mode");
