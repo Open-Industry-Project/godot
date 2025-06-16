@@ -118,6 +118,8 @@ class JoltContactListener3D final
 	bool _try_add_debug_contacts(const JPH::Body &p_soft_body, const JPH::SoftBodyManifold &p_manifold);
 #endif
 
+	bool _is_conveyor_ghost_collision(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold);
+
 	void _flush_contacts();
 	void _flush_area_enters();
 	void _flush_area_exits();
