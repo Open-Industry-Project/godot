@@ -135,6 +135,11 @@ public:
 		GEN_EDIT_STATE_MAIN_INHERITED,
 	};
 
+	enum InstantiationFlags {
+		INSTANTIATION_DEFAULT = 0,
+		INSTANTIATION_NO_SCRIPTS = 1,
+	};
+
 	struct PackState {
 		Ref<SceneState> state;
 		int node = -1;
@@ -160,7 +165,7 @@ public:
 	Error copy_from(const Ref<SceneState> &p_scene_state);
 
 	bool can_instantiate() const;
-	Node *instantiate(GenEditState p_edit_state) const;
+	Node *instantiate(GenEditState p_edit_state, int p_flags = INSTANTIATION_DEFAULT) const;
 
 	Array setup_resources_in_array(Array &array_to_scan, const SceneState::NodeData &n, HashMap<Node *, HashMap<Ref<Resource>, Ref<Resource>>> &p_resources_local_to_scenes, Node *node, const StringName sname, int i, Node **ret_nodes, SceneState::GenEditState p_edit_state) const;
 	Dictionary setup_resources_in_dictionary(Dictionary &p_dictionary_to_scan, const SceneState::NodeData &p_n, HashMap<Node *, HashMap<Ref<Resource>, Ref<Resource>>> &p_resources_local_to_scenes, Node *p_node, const StringName p_sname, int p_i, Node **p_ret_nodes, SceneState::GenEditState p_edit_state) const;
@@ -242,6 +247,7 @@ public:
 };
 
 VARIANT_ENUM_CAST(SceneState::GenEditState)
+VARIANT_ENUM_CAST(SceneState::InstantiationFlags)
 
 class PackedScene : public Resource {
 	GDCLASS(PackedScene, Resource);
@@ -265,12 +271,17 @@ public:
 		GEN_EDIT_STATE_MAIN_INHERITED,
 	};
 
+	enum InstantiationFlags {
+		INSTANTIATION_DEFAULT = 0,
+		INSTANTIATION_NO_SCRIPTS = 1,
+	};
+
 	Error pack(Node *p_scene);
 
 	void clear();
 
 	bool can_instantiate() const;
-	Node *instantiate(GenEditState p_edit_state = GEN_EDIT_STATE_DISABLED) const;
+	Node *instantiate(GenEditState p_edit_state = GEN_EDIT_STATE_DISABLED, int p_flags = INSTANTIATION_DEFAULT) const;
 
 	void recreate_state();
 	void replace_state(Ref<SceneState> p_by);
@@ -290,7 +301,16 @@ public:
 #endif
 	Ref<SceneState> get_state() const;
 
+#ifndef DISABLE_DEPRECATED
+private:
+	Node *_instantiate_bind_compat_107818(GenEditState p_edit_state);
+	static void _bind_compatibility_methods();
+
+public:
+#endif
+
 	PackedScene();
 };
 
 VARIANT_ENUM_CAST(PackedScene::GenEditState)
+VARIANT_ENUM_CAST(PackedScene::InstantiationFlags)
