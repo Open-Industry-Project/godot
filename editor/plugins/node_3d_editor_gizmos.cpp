@@ -819,7 +819,7 @@ void EditorNode3DGizmo::transform() {
 		return;
 	}
 
-	if (gizmo_plugin->get_gizmo_name() != "CollisionShape3D" && gizmo_plugin->get_gizmo_name() != "MeshInstance3D" && !EditorNode::get_singleton()->get_editor_selection()->is_selected(spatial_node)) {
+	if (gizmo_plugin->get_gizmo_name() != "CollisionShape3D" && gizmo_plugin->get_gizmo_name() != "MeshInstance3D" && gizmo_plugin->get_gizmo_name() != "Marker3D" && !EditorNode::get_singleton()->get_editor_selection()->is_selected(spatial_node)) {
 		return;
 	}
 
