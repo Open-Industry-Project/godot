@@ -6403,23 +6403,82 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	hbox->add_child(view_display_menu);
 
 	view_display_menu->get_popup()->set_hide_on_checkable_item_selection(false);
+	view_display_menu->get_popup()->set_use_grid_layout(true);
 
+	// Column-based layout for better organization
+	// Column 0: View Navigation & Camera
 	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/top_view"), VIEW_TOP);
 	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/bottom_view"), VIEW_BOTTOM);
 	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/left_view"), VIEW_LEFT);
 	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/right_view"), VIEW_RIGHT);
 	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/front_view"), VIEW_FRONT);
 	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/rear_view"), VIEW_REAR);
-	view_display_menu->get_popup()->add_separator();
+
+	// Separator between view directions and perspective controls
+	view_display_menu->get_popup()->add_separator("", 9000);
+
 	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/switch_perspective_orthogonal"), VIEW_SWITCH_PERSPECTIVE_ORTHOGONAL);
 	view_display_menu->get_popup()->add_radio_check_item(TTRC("Perspective"), VIEW_PERSPECTIVE);
 	view_display_menu->get_popup()->add_radio_check_item(TTRC("Orthogonal"), VIEW_ORTHOGONAL);
 	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_PERSPECTIVE), true);
-	view_display_menu->get_popup()->add_check_item(TTRC("Auto Orthogonal Enabled"), VIEW_AUTO_ORTHOGONAL);
+	view_display_menu->get_popup()->add_check_item(TTRC("Auto Orthogonal"), VIEW_AUTO_ORTHOGONAL);
 	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_AUTO_ORTHOGONAL), true);
-	view_display_menu->get_popup()->add_separator();
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_lock_rotation", TTRC("Lock View Rotation")), VIEW_LOCK_ROTATION);
-	view_display_menu->get_popup()->add_separator();
+
+	// Set grid positions for Column 0
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_TOP, 0, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_BOTTOM, 1, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_LEFT, 2, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_RIGHT, 3, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_FRONT, 4, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_REAR, 5, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(9000, 6, 0); // Separator
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_SWITCH_PERSPECTIVE_ORTHOGONAL, 7, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_PERSPECTIVE, 8, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_ORTHOGONAL, 9, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_AUTO_ORTHOGONAL, 10, 0);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_LOCK_ROTATION, 11, 0);
+
+	// Column 1: Tools & Debug
+	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_gizmos", TTRC("View Gizmos")), VIEW_GIZMOS);
+	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_transform_gizmo", TTRC("View Transform Gizmo")), VIEW_TRANSFORM_GIZMO);
+
+	// Separator between gizmo controls and audio controls
+	view_display_menu->get_popup()->add_separator("", 9001);
+
+	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_audio_listener", TTRC("Audio Listener")), VIEW_AUDIO_LISTENER);
+	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_audio_doppler", TTRC("Enable Doppler")), VIEW_AUDIO_DOPPLER);
+
+	// Separator between audio controls and cinematic preview
+	view_display_menu->get_popup()->add_separator("", 9002);
+
+	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_cinematic_preview", TTRC("Cinematic Preview")), VIEW_CINEMATIC_PREVIEW);
+
+	// Separator between cinematic preview and camera tools
+	view_display_menu->get_popup()->add_separator("", 9003);
+
+	// Camera tools (moved from column 0)
+	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/focus_origin"), VIEW_CENTER_TO_ORIGIN);
+	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/focus_selection"), VIEW_CENTER_TO_SELECTION);
+	view_display_menu->get_popup()->set_item_tooltip(-1, TTR("Press Focus Selection twice to start following the selection as it moves. Press it yet another time to exit following."));
+	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/align_transform_with_view"), VIEW_ALIGN_TRANSFORM_WITH_VIEW);
+	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/align_rotation_with_view"), VIEW_ALIGN_ROTATION_WITH_VIEW);
+
+	// Set grid positions for Column 1
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_GIZMOS, 0, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_TRANSFORM_GIZMO, 1, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(9001, 2, 1); // Separator
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_AUDIO_LISTENER, 3, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_AUDIO_DOPPLER, 4, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(9002, 5, 1); // Separator
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_CINEMATIC_PREVIEW, 6, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(9003, 7, 1); // Separator
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_CENTER_TO_ORIGIN, 8, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_CENTER_TO_SELECTION, 9, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_ALIGN_TRANSFORM_WITH_VIEW, 10, 1);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_ALIGN_ROTATION_WITH_VIEW, 11, 1);
+
+	// Column 2: Display & Rendering
 	// TRANSLATORS: "Normal" as in "normal life", not "normal vector".
 	view_display_menu->get_popup()->add_radio_check_shortcut(ED_SHORTCUT("spatial_editor/view_display_normal", TTRC("Display Normal")), VIEW_DISPLAY_NORMAL);
 	view_display_menu->get_popup()->add_radio_check_shortcut(ED_SHORTCUT("spatial_editor/view_display_wireframe", TTRC("Display Wireframe")), VIEW_DISPLAY_WIREFRAME);
@@ -6485,32 +6544,33 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 			TTRC("Shows the scene rendered in linear colorspace before any tonemapping or post-processing."));
 	view_display_menu->get_popup()->add_submenu_node_item(TTRC("Display Advanced..."), display_submenu, VIEW_DISPLAY_ADVANCED);
 
-	view_display_menu->get_popup()->add_separator();
+	// Separator between display modes and environment settings
+	view_display_menu->get_popup()->add_separator("", 9004);
+
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_environment", TTRC("View Environment")), VIEW_ENVIRONMENT);
-	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_gizmos", TTRC("View Gizmos")), VIEW_GIZMOS);
-	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_transform_gizmo", TTRC("View Transform Gizmo")), VIEW_TRANSFORM_GIZMO);
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_grid_lines", TTRC("View Grid")), VIEW_GRID);
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_information", TTRC("View Information")), VIEW_INFORMATION);
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_fps", TTRC("View Frame Time")), VIEW_FRAME_TIME);
-	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_ENVIRONMENT), true);
-	view_display_menu->get_popup()->add_separator();
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_half_resolution", TTRC("Half Resolution")), VIEW_HALF_RESOLUTION);
-	view_display_menu->get_popup()->add_separator();
-	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_audio_listener", TTRC("Audio Listener")), VIEW_AUDIO_LISTENER);
-	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_audio_doppler", TTRC("Enable Doppler")), VIEW_AUDIO_DOPPLER);
+
+	// Set grid positions for Column 2
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_DISPLAY_NORMAL, 0, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_DISPLAY_WIREFRAME, 1, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_DISPLAY_OVERDRAW, 2, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_DISPLAY_LIGHTING, 3, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_DISPLAY_UNSHADED, 4, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_DISPLAY_ADVANCED, 5, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(9004, 6, 2); // Separator
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_ENVIRONMENT, 7, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_GRID, 8, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_INFORMATION, 9, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_FRAME_TIME, 10, 2);
+	view_display_menu->get_popup()->set_item_grid_position_by_id(VIEW_HALF_RESOLUTION, 11, 2);
+	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_ENVIRONMENT), true);
 	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_GIZMOS), true);
 	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_TRANSFORM_GIZMO), true);
 	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_GRID), true);
 
-	view_display_menu->get_popup()->add_separator();
-	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_cinematic_preview", TTRC("Cinematic Preview")), VIEW_CINEMATIC_PREVIEW);
-
-	view_display_menu->get_popup()->add_separator();
-	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/focus_origin"), VIEW_CENTER_TO_ORIGIN);
-	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/focus_selection"), VIEW_CENTER_TO_SELECTION);
-	view_display_menu->get_popup()->set_item_tooltip(-1, TTR("Press Focus Selection twice to start following the selection as it moves. Press it yet another time to exit following."));
-	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/align_transform_with_view"), VIEW_ALIGN_TRANSFORM_WITH_VIEW);
-	view_display_menu->get_popup()->add_shortcut(ED_GET_SHORTCUT("spatial_editor/align_rotation_with_view"), VIEW_ALIGN_ROTATION_WITH_VIEW);
 	view_display_menu->get_popup()->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
 	display_submenu->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditorViewport::_menu_option));
 	view_display_menu->set_disable_shortcuts(true);
@@ -10149,7 +10209,7 @@ Node3DEditor::Node3DEditor() {
 	ED_SHORTCUT("spatial_editor/orbit_view_right", TTRC("Orbit View Right"), Key::KP_6);
 	ED_SHORTCUT("spatial_editor/orbit_view_up", TTRC("Orbit View Up"), Key::KP_8);
 	ED_SHORTCUT("spatial_editor/orbit_view_180", TTRC("Orbit View 180"), Key::KP_9);
-	ED_SHORTCUT("spatial_editor/switch_perspective_orthogonal", TTRC("Switch Perspective/Orthogonal View"), Key::KP_5);
+	ED_SHORTCUT("spatial_editor/switch_perspective_orthogonal", TTRC("Switch View Mode"), Key::KP_5);
 	ED_SHORTCUT("spatial_editor/insert_anim_key", TTRC("Insert Animation Key"), Key::K);
 	ED_SHORTCUT("spatial_editor/focus_origin", TTRC("Focus Origin"), Key::O);
 	ED_SHORTCUT("spatial_editor/focus_selection", TTRC("Focus Selection"), Key::F);

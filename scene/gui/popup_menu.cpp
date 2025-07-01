@@ -76,6 +76,22 @@ int PopupMenu::_get_item_checkable_type(int p_index) const {
 	return items[p_index].checkable_type;
 }
 
+void PopupMenu::_set_item_grid_position_vector(int p_index, const Vector2i &p_position) {
+	ERR_FAIL_INDEX(p_index, items.size());
+	items.write[p_index]._grid_row = p_position.y;
+	items.write[p_index]._grid_col = p_position.x;
+	if (use_grid_layout) {
+		control->queue_redraw();
+		child_controls_changed();
+		_menu_changed();
+	}
+}
+
+Vector2i PopupMenu::_get_item_grid_position_vector(int p_index) const {
+	ERR_FAIL_INDEX_V(p_index, items.size(), Vector2i());
+	return Vector2i(items[p_index]._grid_col, items[p_index]._grid_row);
+}
+
 RID PopupMenu::bind_global_menu() {
 #ifdef TOOLS_ENABLED
 	if (is_part_of_edited_scene()) {
@@ -227,59 +243,132 @@ Size2 PopupMenu::_get_contents_minimum_size() const {
 	minsize.width += panel->get_offset(SIDE_LEFT) - panel->get_offset(SIDE_RIGHT);
 	minsize.height += panel->get_offset(SIDE_TOP) - panel->get_offset(SIDE_BOTTOM);
 
-	float max_w = 0.0;
-	float icon_w = 0.0;
-	int check_w = MAX(theme_cache.checked->get_width(), theme_cache.radio_checked->get_width()) + theme_cache.h_separation;
-	int accel_max_w = 0;
-	bool has_check = false;
+	if (use_grid_layout) {
+		// Grid layout with explicit positioning
+		int max_row = 0;
+		int max_col = 0;
+		float max_item_height = 0.0;
+		bool has_check = false;
 
-	for (int i = 0; i < items.size(); i++) {
-		Size2 item_size;
-		_shape_item(i);
+		for (int i = 0; i < items.size(); i++) {
+			_shape_item(i);
 
-		Size2 icon_size = _get_item_icon_size(i);
-		item_size.height = _get_item_height(i);
-		icon_w = MAX(icon_size.width, icon_w);
+			if (items[i].checkable_type && !items[i].separator) {
+				has_check = true;
+			}
 
-		item_size.width += items[i].indent * theme_cache.indent;
+			float item_height = _get_item_height(i);
 
-		if (items[i].checkable_type && !items[i].separator) {
-			has_check = true;
+			max_item_height = MAX(max_item_height, item_height);
+			max_row = MAX(max_row, items[i]._grid_row);
+			max_col = MAX(max_col, items[i]._grid_col);
 		}
 
-		item_size.width += items[i].text_buf->get_size().x;
-		item_size.height += theme_cache.v_separation;
+		int grid_columns = max_col + 1;
+		int grid_rows = max_row + 1;
 
-		if (items[i].accel != Key::NONE || (items[i].shortcut.is_valid() && items[i].shortcut->has_valid_event())) {
-			int accel_w = theme_cache.h_separation * 2;
-			accel_w += items[i].accel_text_buf->get_size().x;
-			accel_max_w = MAX(accel_w, accel_max_w);
+		// Calculate per-column widths including padding
+		Vector<float> column_widths;
+		column_widths.resize(grid_columns);
+		column_widths.fill(0.0);
+
+		for (int i = 0; i < items.size(); i++) {
+			float item_width = _get_item_width(i);
+			// Add generous padding to prevent overlap - extra space for text and shortcuts
+			float padded_width = item_width + theme_cache.item_start_padding + theme_cache.item_end_padding + theme_cache.h_separation * 6;
+
+			int col = items[i]._grid_col;
+			if (col >= 0 && col < grid_columns) {
+				column_widths.write[col] = MAX(column_widths[col], padded_width);
+			}
 		}
 
-		if (items[i].submenu) {
-			item_size.width += theme_cache.submenu->get_width();
+		float total_width = 0.0;
+		for (int c = 0; c < grid_columns; c++) {
+			total_width += column_widths[c];
+			if (c < grid_columns - 1) {
+				total_width += theme_cache.h_separation; // Separation between columns
+			}
 		}
 
-		max_w = MAX(max_w, item_size.width);
+		minsize.width += total_width;
+		minsize.height += (max_item_height + theme_cache.v_separation) * grid_rows;
 
-		minsize.height += item_size.height;
+		if (has_check) {
+			int check_h = MAX(theme_cache.checked->get_height(), theme_cache.radio_checked->get_height());
+			minsize.height += check_h;
+		}
+
+		if (is_inside_tree()) {
+			int width_limit = get_usable_parent_rect().size.width;
+			int height_limit = get_usable_parent_rect().size.height;
+			if (minsize.width > width_limit) {
+				minsize.width = width_limit;
+			}
+			if (minsize.height > height_limit) {
+				minsize.height = height_limit;
+			}
+		}
+
+		minsize.width = Math::ceil(minsize.width);
+		minsize.height = Math::ceil(minsize.height);
+	} else {
+		// Traditional vertical layout
+		float max_w = 0.0;
+		float icon_w = 0.0;
+		int check_w = MAX(theme_cache.checked->get_width(), theme_cache.radio_checked->get_width()) + theme_cache.h_separation;
+		int accel_max_w = 0;
+		bool has_check = false;
+
+		for (int i = 0; i < items.size(); i++) {
+			Size2 item_size;
+			_shape_item(i);
+
+			Size2 icon_size = _get_item_icon_size(i);
+			item_size.height = _get_item_height(i);
+			icon_w = MAX(icon_size.width, icon_w);
+
+			item_size.width += items[i].indent * theme_cache.indent;
+
+			if (items[i].checkable_type && !items[i].separator) {
+				has_check = true;
+			}
+
+			item_size.width += items[i].text_buf->get_size().x;
+			item_size.height += theme_cache.v_separation;
+
+			if (items[i].accel != Key::NONE || (items[i].shortcut.is_valid() && items[i].shortcut->has_valid_event())) {
+				int accel_w = theme_cache.h_separation * 2;
+				accel_w += items[i].accel_text_buf->get_size().x;
+				accel_max_w = MAX(accel_w, accel_max_w);
+			}
+
+			if (items[i].submenu) {
+				item_size.width += theme_cache.submenu->get_width();
+			}
+
+			max_w = MAX(max_w, item_size.width);
+
+			minsize.height += item_size.height;
+		}
+
+		int item_side_padding = theme_cache.item_start_padding + theme_cache.item_end_padding;
+		minsize.width += max_w + icon_w + accel_max_w + item_side_padding;
+
+		if (has_check) {
+			minsize.width += check_w;
+		}
+
+		if (is_inside_tree()) {
+			int height_limit = get_usable_parent_rect().size.height;
+			if (minsize.height > height_limit) {
+				minsize.height = height_limit;
+			}
+		}
+
+		minsize.height = Math::ceil(minsize.height);
 	}
 
-	int item_side_padding = theme_cache.item_start_padding + theme_cache.item_end_padding;
-	minsize.width += max_w + icon_w + accel_max_w + item_side_padding;
-
-	if (has_check) {
-		minsize.width += check_w;
-	}
-
-	if (is_inside_tree()) {
-		int height_limit = get_usable_parent_rect().size.height;
-		if (minsize.height > height_limit) {
-			minsize.height = height_limit;
-		}
-	}
-
-	minsize.height = Math::ceil(minsize.height); // Ensures enough height at fractional content scales to prevent the v_scroll_bar from showing.
 	return minsize;
 }
 
@@ -303,6 +392,42 @@ int PopupMenu::_get_item_height(int p_idx) const {
 	}
 
 	return MAX(separator_height, MAX(text_height, icon_height));
+}
+
+int PopupMenu::_get_item_width(int p_idx) const {
+	ERR_FAIL_INDEX_V(p_idx, items.size(), 0);
+
+	_shape_item(p_idx);
+
+	Size2 icon_size = _get_item_icon_size(p_idx);
+	int icon_width = icon_size.width;
+
+	int text_width = items[p_idx].text_buf->get_size().width;
+	if (text_width == 0 && !items[p_idx].separator) {
+		text_width = theme_cache.font->get_height(theme_cache.font_size);
+	}
+
+	int separator_width = 0;
+	if (items[p_idx].separator) {
+		separator_width = MAX(theme_cache.separator_style->get_minimum_size().width, MAX(theme_cache.labeled_separator_left->get_minimum_size().width, theme_cache.labeled_separator_right->get_minimum_size().width));
+	}
+
+	int total_width = text_width + icon_width;
+	if (items[p_idx].accel != Key::NONE || (items[p_idx].shortcut.is_valid() && items[p_idx].shortcut->has_valid_event())) {
+		total_width += theme_cache.h_separation + items[p_idx].accel_text_buf->get_size().width;
+	}
+
+	if (items[p_idx].submenu) {
+		total_width += theme_cache.submenu->get_width();
+	}
+
+	if (items[p_idx].checkable_type && !items[p_idx].separator) {
+		total_width += MAX(theme_cache.checked->get_width(), theme_cache.radio_checked->get_width());
+	}
+
+	total_width += items[p_idx].indent * theme_cache.indent;
+
+	return MAX(separator_width, total_width);
 }
 
 int PopupMenu::_get_items_total_height() const {
@@ -330,13 +455,43 @@ int PopupMenu::_get_mouse_over(const Point2 &p_over) const {
 
 	// Perform item hit check in control node local space,
 	// so we don't need to worry about any of the container theming.
-	const float over_control_y = control->get_transform().xform_inv(over_scroll_container).y;
-	float bottom_edge = 0;
-	for (int i = 0; i < items.size(); i++) {
-		bottom_edge += theme_cache.v_separation;
-		bottom_edge += _get_item_height(i);
-		if (bottom_edge > over_control_y) {
-			return i;
+	const Point2 over_control = control->get_transform().xform_inv(over_scroll_container);
+
+	if (items.size() == 0) {
+		return -1;
+	}
+
+	if (use_grid_layout) {
+		GridColumnInfo grid_info = _calculate_grid_layout_info();
+
+		int clicked_row = (int)(over_control.y / grid_info.cell_height);
+
+		// Find which column was clicked
+		int clicked_col = -1;
+		for (int c = 0; c < grid_info.grid_columns; c++) {
+			if (over_control.x >= grid_info.column_positions[c] && over_control.x < grid_info.column_positions[c + 1]) {
+				clicked_col = c;
+				break;
+			}
+		}
+
+		if (clicked_col >= 0) {
+			// Find item at this grid position
+			for (int i = 0; i < items.size(); i++) {
+				if (items[i]._grid_row == clicked_row && items[i]._grid_col == clicked_col) {
+					return i;
+				}
+			}
+		}
+	} else {
+		// Vertical layout - check y position
+		float bottom_edge = 0;
+		for (int i = 0; i < items.size(); i++) {
+			bottom_edge += theme_cache.v_separation;
+			bottom_edge += _get_item_height(i);
+			if (bottom_edge > over_control.y) {
+				return i;
+			}
 		}
 	}
 
@@ -485,29 +640,41 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 				}
 				set_process_internal(true);
 			}
-			int search_from = mouse_over + 1;
-			if (search_from >= items.size()) {
-				search_from = 0;
-			}
 
-			bool match_found = false;
-			for (int i = search_from; i < items.size(); i++) {
-				if (!items[i].separator && !items[i].disabled) {
-					prev_mouse_over = mouse_over;
-					mouse_over = i;
-					emit_signal(SNAME("id_focused"), items[i].id);
-					scroll_to_item(i);
-					queue_accessibility_update();
-					control->queue_redraw();
-					set_input_as_handled();
-					match_found = true;
-					break;
+			if (use_grid_layout) {
+				// Grid mode - down moves to next row
+				if (mouse_over >= 0) {
+					int current_row = items[mouse_over]._grid_row;
+					int current_col = items[mouse_over]._grid_col;
+
+					// Find item below in the same column
+					int target_index = -1;
+					for (int i = 0; i < items.size(); i++) {
+						if (items[i]._grid_row == current_row + 1 && items[i]._grid_col == current_col && !items[i].separator && !items[i].disabled) {
+							target_index = i;
+							break;
+						}
+					}
+
+					if (target_index >= 0) {
+						prev_mouse_over = mouse_over;
+						mouse_over = target_index;
+						emit_signal(SNAME("id_focused"), items[target_index].id);
+						scroll_to_item(target_index);
+						queue_accessibility_update();
+						control->queue_redraw();
+						set_input_as_handled();
+					}
 				}
-			}
+			} else {
+				// Vertical mode - original behavior
+				int search_from = mouse_over + 1;
+				if (search_from >= items.size()) {
+					search_from = 0;
+				}
 
-			if (!match_found) {
-				// If the last item is not selectable, try re-searching from the start.
-				for (int i = 0; i < search_from; i++) {
+				bool match_found = false;
+				for (int i = search_from; i < items.size(); i++) {
 					if (!items[i].separator && !items[i].disabled) {
 						prev_mouse_over = mouse_over;
 						mouse_over = i;
@@ -516,7 +683,24 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 						queue_accessibility_update();
 						control->queue_redraw();
 						set_input_as_handled();
+						match_found = true;
 						break;
+					}
+				}
+
+				if (!match_found) {
+					// If the last item is not selectable, try re-searching from the start.
+					for (int i = 0; i < search_from; i++) {
+						if (!items[i].separator && !items[i].disabled) {
+							prev_mouse_over = mouse_over;
+							mouse_over = i;
+							emit_signal(SNAME("id_focused"), items[i].id);
+							scroll_to_item(i);
+							queue_accessibility_update();
+							control->queue_redraw();
+							set_input_as_handled();
+							break;
+						}
 					}
 				}
 			}
@@ -527,29 +711,41 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 				}
 				set_process_internal(true);
 			}
-			int search_from = mouse_over - 1;
-			if (search_from < 0) {
-				search_from = items.size() - 1;
-			}
 
-			bool match_found = false;
-			for (int i = search_from; i >= 0; i--) {
-				if (!items[i].separator && !items[i].disabled) {
-					prev_mouse_over = mouse_over;
-					mouse_over = i;
-					emit_signal(SNAME("id_focused"), items[i].id);
-					scroll_to_item(i);
-					queue_accessibility_update();
-					control->queue_redraw();
-					set_input_as_handled();
-					match_found = true;
-					break;
+			if (use_grid_layout) {
+				// Grid mode - up moves to previous row
+				if (mouse_over >= 0) {
+					int current_row = items[mouse_over]._grid_row;
+					int current_col = items[mouse_over]._grid_col;
+
+					// Find item above in the same column
+					int target_index = -1;
+					for (int i = 0; i < items.size(); i++) {
+						if (items[i]._grid_row == current_row - 1 && items[i]._grid_col == current_col && !items[i].separator && !items[i].disabled) {
+							target_index = i;
+							break;
+						}
+					}
+
+					if (target_index >= 0) {
+						prev_mouse_over = mouse_over;
+						mouse_over = target_index;
+						emit_signal(SNAME("id_focused"), items[target_index].id);
+						scroll_to_item(target_index);
+						queue_accessibility_update();
+						control->queue_redraw();
+						set_input_as_handled();
+					}
 				}
-			}
+			} else {
+				// Vertical mode - original behavior
+				int search_from = mouse_over - 1;
+				if (search_from < 0) {
+					search_from = items.size() - 1;
+				}
 
-			if (!match_found) {
-				// If the first item is not selectable, try re-searching from the end.
-				for (int i = items.size() - 1; i >= search_from; i--) {
+				bool match_found = false;
+				for (int i = search_from; i >= 0; i--) {
 					if (!items[i].separator && !items[i].disabled) {
 						prev_mouse_over = mouse_over;
 						mouse_over = i;
@@ -558,32 +754,105 @@ void PopupMenu::_input_from_window_internal(const Ref<InputEvent> &p_event) {
 						queue_accessibility_update();
 						control->queue_redraw();
 						set_input_as_handled();
+						match_found = true;
 						break;
+					}
+				}
+
+				if (!match_found) {
+					// If the first item is not selectable, try re-searching from the end.
+					for (int i = items.size() - 1; i >= search_from; i--) {
+						if (!items[i].separator && !items[i].disabled) {
+							prev_mouse_over = mouse_over;
+							mouse_over = i;
+							emit_signal(SNAME("id_focused"), items[i].id);
+							scroll_to_item(i);
+							queue_accessibility_update();
+							control->queue_redraw();
+							set_input_as_handled();
+							break;
+						}
 					}
 				}
 			}
 		} else if (p_event->is_action("ui_left", true) && p_event->is_pressed()) {
-			Node *n = get_parent();
-			if (n) {
-				if (Object::cast_to<PopupMenu>(n)) {
-					hide();
-					set_input_as_handled();
-				} else if (Object::cast_to<MenuBar>(n)) {
-					Object::cast_to<MenuBar>(n)->gui_input(p_event);
-					set_input_as_handled();
-					return;
+			if (use_grid_layout) {
+				// Grid mode - left moves to previous column
+				if (mouse_over >= 0) {
+					int current_row = items[mouse_over]._grid_row;
+					int current_col = items[mouse_over]._grid_col;
+
+					// Find item to the left in the same row
+					int target_index = -1;
+					for (int i = 0; i < items.size(); i++) {
+						if (items[i]._grid_row == current_row && items[i]._grid_col == current_col - 1 && !items[i].separator && !items[i].disabled) {
+							target_index = i;
+							break;
+						}
+					}
+
+					if (target_index >= 0) {
+						prev_mouse_over = mouse_over;
+						mouse_over = target_index;
+						emit_signal(SNAME("id_focused"), items[target_index].id);
+						scroll_to_item(target_index);
+						queue_accessibility_update();
+						control->queue_redraw();
+						set_input_as_handled();
+					}
+				}
+			} else {
+				// Vertical mode - original behavior
+				Node *n = get_parent();
+				if (n) {
+					if (Object::cast_to<PopupMenu>(n)) {
+						hide();
+						set_input_as_handled();
+					} else if (Object::cast_to<MenuBar>(n)) {
+						Object::cast_to<MenuBar>(n)->gui_input(p_event);
+						set_input_as_handled();
+						return;
+					}
 				}
 			}
 		} else if (p_event->is_action("ui_right", true) && p_event->is_pressed()) {
-			if (mouse_over >= 0 && mouse_over < items.size() && !items[mouse_over].separator && items[mouse_over].submenu && submenu_over != mouse_over) {
-				_activate_submenu(mouse_over, true);
-				set_input_as_handled();
+			if (use_grid_layout) {
+				// Grid mode - right moves to next column
+				if (mouse_over >= 0) {
+					int current_row = items[mouse_over]._grid_row;
+					int current_col = items[mouse_over]._grid_col;
+
+					// Find item to the right in the same row
+					int target_index = -1;
+					for (int i = 0; i < items.size(); i++) {
+						if (items[i]._grid_row == current_row && items[i]._grid_col == current_col + 1 && !items[i].separator && !items[i].disabled) {
+							target_index = i;
+							break;
+						}
+					}
+
+					if (target_index >= 0) {
+						prev_mouse_over = mouse_over;
+						mouse_over = target_index;
+						emit_signal(SNAME("id_focused"), items[target_index].id);
+						scroll_to_item(target_index);
+						queue_accessibility_update();
+						control->queue_redraw();
+						set_input_as_handled();
+					}
+				}
 			} else {
-				Node *n = get_parent();
-				if (n && Object::cast_to<MenuBar>(n)) {
-					Object::cast_to<MenuBar>(n)->gui_input(p_event);
+				// Vertical mode - original behavior
+				if (mouse_over >= 0 && mouse_over < items.size() && !items[mouse_over].separator && items[mouse_over].submenu && submenu_over != mouse_over) {
+					_activate_submenu(mouse_over, true);
 					set_input_as_handled();
-					return;
+				} else {
+					Node *n = get_parent();
+					if (n && Object::cast_to<MenuBar>(n)) {
+						Object::cast_to<MenuBar>(n)->gui_input(p_event);
+						set_input_as_handled();
+						return;
+					}
 				}
 			}
 		} else if (p_event->is_action("ui_accept", true) && p_event->is_pressed()) {
@@ -777,12 +1046,25 @@ void PopupMenu::_mouse_over_update(const Point2 &p_over) {
 }
 
 void PopupMenu::_draw_items() {
-	control->set_custom_minimum_size(Size2(0, _get_items_total_height()));
-	RID ci = control->get_canvas_item();
+	if (use_grid_layout) {
+		GridColumnInfo grid_info = _calculate_grid_layout_info();
 
-	// Space between the item content and the sides of popup menu.
+		float total_width = 0.0;
+		for (int c = 0; c < grid_info.grid_columns; c++) {
+			total_width += grid_info.column_widths[c];
+			if (c < grid_info.grid_columns - 1) {
+				total_width += theme_cache.h_separation;
+			}
+		}
+
+		float total_height = grid_info.cell_height * grid_info.grid_rows;
+		control->set_custom_minimum_size(Size2(total_width, total_height));
+	} else {
+		control->set_custom_minimum_size(Size2(0, _get_items_total_height()));
+	}
+
+	RID ci = control->get_canvas_item();
 	bool rtl = control->is_layout_rtl();
-	// In Item::checkable_type enum order (less the non-checkable member), with disabled repeated at the end.
 	Ref<Texture2D> check[] = { theme_cache.checked, theme_cache.radio_checked, theme_cache.checked_disabled, theme_cache.radio_checked_disabled };
 	Ref<Texture2D> uncheck[] = { theme_cache.unchecked, theme_cache.radio_unchecked, theme_cache.unchecked_disabled, theme_cache.radio_unchecked_disabled };
 	Ref<Texture2D> submenu;
@@ -792,205 +1074,314 @@ void PopupMenu::_draw_items() {
 		submenu = theme_cache.submenu;
 	}
 
-	float display_width = control->get_size().width;
+	if (use_grid_layout) {
+		GridColumnInfo grid_info = _calculate_grid_layout_info();
 
-	// Find the widest icon and whether any items have a checkbox, and store the offsets for each.
-	float icon_ofs = 0.0;
-	bool has_check = false;
-	for (int i = 0; i < items.size(); i++) {
-		if (items[i].separator) {
-			continue;
-		}
+		for (int i = 0; i < items.size(); i++) {
+			_shape_item(i);
 
-		Size2 icon_size = _get_item_icon_size(i);
-		icon_ofs = MAX(icon_size.width, icon_ofs);
-
-		if (items[i].checkable_type) {
-			has_check = true;
-		}
-	}
-	if (icon_ofs > 0.0) {
-		icon_ofs += theme_cache.h_separation;
-	}
-
-	float check_ofs = 0.0;
-	if (has_check) {
-		for (int i = 0; i < 4; i++) {
-			check_ofs = MAX(check_ofs, check[i]->get_width());
-			check_ofs = MAX(check_ofs, uncheck[i]->get_width());
-		}
-		check_ofs += theme_cache.h_separation;
-	}
-
-	Point2 ofs;
-
-	// Loop through all items and draw each.
-	for (int i = 0; i < items.size(); i++) {
-		// For the first item only add half a separation. For all other items, add a whole separation to the offset.
-		ofs.y += i > 0 ? theme_cache.v_separation : (float)theme_cache.v_separation / 2;
-
-		_shape_item(i);
-
-		Point2 item_ofs = ofs;
-		Size2 icon_size = _get_item_icon_size(i);
-		float h = _get_item_height(i);
-
-		if (i == mouse_over) {
-			theme_cache.hover_style->draw(ci, Rect2(item_ofs + Point2(0, -theme_cache.v_separation / 2), Size2(display_width, h + theme_cache.v_separation)));
-		}
-
-		String text = items[i].xl_text;
-
-		// Separator
-		item_ofs.x += items[i].indent * theme_cache.indent;
-		if (items[i].separator) {
-			if (!text.is_empty() || items[i].icon.is_valid()) {
-				int content_size = items[i].text_buf->get_size().width + theme_cache.h_separation * 2;
-				if (items[i].icon.is_valid()) {
-					content_size += icon_size.width + theme_cache.h_separation;
-				}
-
-				int content_center = display_width / 2;
-				int content_left = content_center - content_size / 2;
-				int content_right = content_center + content_size / 2;
-				if (content_left > item_ofs.x) {
-					int sep_h = theme_cache.labeled_separator_left->get_minimum_size().height;
-					int sep_ofs = Math::floor((h - sep_h) / 2.0);
-					theme_cache.labeled_separator_left->draw(ci, Rect2(item_ofs + Point2(0, sep_ofs), Size2(MAX(0, content_left - item_ofs.x), sep_h)));
-				}
-				if (content_right < display_width) {
-					int sep_h = theme_cache.labeled_separator_right->get_minimum_size().height;
-					int sep_ofs = Math::floor((h - sep_h) / 2.0);
-					theme_cache.labeled_separator_right->draw(ci, Rect2(Point2(content_right, item_ofs.y + sep_ofs), Size2(MAX(0, display_width - content_right), sep_h)));
-				}
+			Point2 item_ofs;
+			int col = items[i]._grid_col;
+			if (col >= 0 && col < grid_info.grid_columns) {
+				item_ofs.x = grid_info.column_positions[col];
 			} else {
-				int sep_h = theme_cache.separator_style->get_minimum_size().height;
-				int sep_ofs = Math::floor((h - sep_h) / 2.0);
-				theme_cache.separator_style->draw(ci, Rect2(item_ofs + Point2(0, sep_ofs), Size2(display_width, sep_h)));
+				item_ofs.x = 0;
 			}
-		}
+			item_ofs.y = items[i]._grid_row * grid_info.cell_height;
 
-		Color icon_color = items[i].icon_modulate;
+			Size2 icon_size = _get_item_icon_size(i);
+			float w = (col >= 0 && col < grid_info.grid_columns) ? grid_info.column_widths[col] : 0.0;
+			float h = grid_info.cell_height - theme_cache.v_separation;
 
-		// For non-separator items, add some padding for the content.
-		if (!items[i].separator) {
-			item_ofs.x += theme_cache.item_start_padding;
-		}
-
-		// Checkboxes
-		if (items[i].checkable_type && !items[i].separator) {
-			int disabled = int(items[i].disabled) * 2;
-			Texture2D *icon = (items[i].checked ? check[items[i].checkable_type - 1 + disabled] : uncheck[items[i].checkable_type - 1 + disabled]).ptr();
-			if (rtl) {
-				icon->draw(ci, Size2(control->get_size().width - item_ofs.x - icon->get_width(), item_ofs.y) + Point2(0, Math::floor((h - icon->get_height()) / 2.0)), icon_color);
-			} else {
-				icon->draw(ci, item_ofs + Point2(0, Math::floor((h - icon->get_height()) / 2.0)), icon_color);
+			if (i == mouse_over) {
+				theme_cache.hover_style->draw(ci, Rect2(item_ofs, Size2(w + theme_cache.h_separation, h + theme_cache.v_separation)));
 			}
-		}
 
-		int separator_ofs = (display_width - items[i].text_buf->get_size().width) / 2;
+			String text = items[i].xl_text;
+			Color icon_color = items[i].icon_modulate;
 
-		// Icon
-		if (items[i].icon.is_valid()) {
-			const Point2 icon_offset = Point2(0, Math::floor((h - icon_size.height) / 2.0));
-			Point2 icon_pos;
+			if (!items[i].separator) {
+				item_ofs.x += theme_cache.item_start_padding;
+				item_ofs.y += theme_cache.item_start_padding;
+			}
+
+			bool has_accel = items[i].accel != Key::NONE || (items[i].shortcut.is_valid() && items[i].shortcut->has_valid_event());
+
+			float column_check_width = (col >= 0 && col < grid_info.grid_columns) ? grid_info.column_check_widths[col] : 0.0;
+			float column_icon_width = (col >= 0 && col < grid_info.grid_columns) ? grid_info.column_icon_widths[col] : 0.0;
+
+			Vector2 text_pos = item_ofs + Point2(theme_cache.h_separation + column_check_width + column_icon_width, (h - items[i].text_buf->get_size().y) / 2);
+
+			if (has_accel) {
+				Vector2 accel_pos = item_ofs + Point2(w - items[i].accel_text_buf->get_size().x - theme_cache.h_separation, (h - items[i].accel_text_buf->get_size().y) / 2);
+				Color accel_color = items[i].disabled ? theme_cache.font_disabled_color : (i == mouse_over ? theme_cache.font_hover_color : theme_cache.font_accelerator_color);
+
+				if (theme_cache.font_outline_size > 0 && theme_cache.font_outline_color.a > 0) {
+					items[i].accel_text_buf->draw_outline(ci, accel_pos, theme_cache.font_outline_size, theme_cache.font_outline_color);
+				}
+				items[i].accel_text_buf->draw(ci, accel_pos, accel_color);
+			}
+
+			if (items[i].icon.is_valid()) {
+				Point2 icon_pos = item_ofs + Point2(theme_cache.h_separation + column_check_width, (h - icon_size.height) / 2);
+				text_pos.x = icon_pos.x + icon_size.width + theme_cache.h_separation;
+				items[i].icon->draw_rect(ci, Rect2(icon_pos, icon_size), false, icon_color);
+			}
+
+			if (items[i].checkable_type && !items[i].separator) {
+				Ref<Texture2D> icon_to_draw;
+				if (items[i].checked) {
+					icon_to_draw = items[i].disabled ? check[items[i].checkable_type + 2] : check[items[i].checkable_type];
+				} else {
+					icon_to_draw = items[i].disabled ? uncheck[items[i].checkable_type + 2] : uncheck[items[i].checkable_type];
+				}
+
+				if (icon_to_draw.is_valid()) {
+					Point2 check_pos;
+					if (rtl) {
+						check_pos = item_ofs + Point2(w - icon_to_draw->get_width() - theme_cache.h_separation, (h - icon_to_draw->get_height()) / 2);
+					} else {
+						check_pos = item_ofs + Point2(theme_cache.h_separation, (h - icon_to_draw->get_height()) / 2);
+					}
+					icon_to_draw->draw(ci, check_pos);
+				}
+			}
+
+			if (items[i].submenu && !items[i].separator) {
+				Point2 submenu_pos;
+				if (rtl) {
+					submenu_pos = item_ofs + Point2(theme_cache.h_separation, (h - submenu->get_height()) / 2);
+				} else {
+					submenu_pos = item_ofs + Point2(w - submenu->get_width() - theme_cache.h_separation, (h - submenu->get_height()) / 2);
+				}
+				submenu->draw(ci, submenu_pos);
+			}
 
 			if (items[i].separator) {
-				separator_ofs -= (icon_size.width + theme_cache.h_separation) / 2;
+				Point2 sep_pos = item_ofs + Point2(0, h / 2);
+				if (!items[i].text.is_empty() || items[i].icon.is_valid()) {
+					Size2 content_size = items[i].text_buf->get_size();
+					if (items[i].icon.is_valid()) {
+						content_size.x += icon_size.width + theme_cache.h_separation;
+					}
+					Point2 content_center = item_ofs + Point2((w - content_size.x) / 2, (h - content_size.y) / 2);
 
-				if (rtl) {
-					icon_pos = Size2(control->get_size().width - item_ofs.x - separator_ofs - icon_size.width, item_ofs.y);
+					theme_cache.labeled_separator_left->draw(ci, Rect2(sep_pos, Size2(content_center.x - item_ofs.x, theme_cache.labeled_separator_left->get_minimum_size().height)));
+
+					if (items[i].icon.is_valid()) {
+						items[i].icon->draw_rect(ci, Rect2(content_center, icon_size), false, icon_color);
+						content_center.x += icon_size.width + theme_cache.h_separation;
+					}
+					if (!items[i].text.is_empty()) {
+						Color text_color = items[i].disabled ? theme_cache.font_disabled_color : theme_cache.font_separator_color;
+						if (theme_cache.font_outline_size > 0 && theme_cache.font_outline_color.a > 0) {
+							items[i].text_buf->draw_outline(ci, content_center, theme_cache.font_outline_size, theme_cache.font_outline_color);
+						}
+						items[i].text_buf->draw(ci, content_center, text_color);
+					}
+
+					Point2 right_sep_pos = Point2(content_center.x + items[i].text_buf->get_size().x, sep_pos.y);
+					theme_cache.labeled_separator_right->draw(ci, Rect2(right_sep_pos, Size2(item_ofs.x + w - right_sep_pos.x, theme_cache.labeled_separator_right->get_minimum_size().height)));
 				} else {
-					icon_pos = item_ofs + Size2(separator_ofs, 0);
-					separator_ofs += icon_size.width + theme_cache.h_separation;
+					theme_cache.separator_style->draw(ci, Rect2(sep_pos, Size2(w, theme_cache.separator_style->get_minimum_size().height)));
 				}
 			} else {
-				if (rtl) {
-					icon_pos = Size2(control->get_size().width - item_ofs.x - check_ofs - icon_size.width, item_ofs.y);
-				} else {
-					icon_pos = item_ofs + Size2(check_ofs, 0);
-				}
-			}
-
-			items[i].icon->draw_rect(ci, Rect2(icon_pos + icon_offset, icon_size), false, icon_color);
-		}
-
-		// Submenu arrow on right hand side.
-		if (items[i].submenu) {
-			if (rtl) {
-				submenu->draw(ci, Point2(theme_cache.panel_style->get_margin(SIDE_LEFT) + theme_cache.item_end_padding, item_ofs.y + Math::floor(h - submenu->get_height()) / 2), icon_color);
-			} else {
-				submenu->draw(ci, Point2(display_width - theme_cache.panel_style->get_margin(SIDE_RIGHT) - submenu->get_width() - theme_cache.item_end_padding, item_ofs.y + Math::floor(h - submenu->get_height()) / 2), icon_color);
-			}
-		}
-
-		// Text
-		if (items[i].separator) {
-			if (!text.is_empty()) {
-				Vector2 text_pos = Point2(separator_ofs, item_ofs.y + Math::floor((h - items[i].text_buf->get_size().y) / 2.0));
-
-				if (theme_cache.font_separator_outline_size > 0 && theme_cache.font_separator_outline_color.a > 0) {
-					items[i].text_buf->draw_outline(ci, text_pos, theme_cache.font_separator_outline_size, theme_cache.font_separator_outline_color);
-				}
-				items[i].text_buf->draw(ci, text_pos, theme_cache.font_separator_color);
-			}
-		} else {
-			item_ofs.x += icon_ofs + check_ofs;
-
-			if (rtl) {
-				Vector2 text_pos = Size2(control->get_size().width - items[i].text_buf->get_size().width - item_ofs.x, item_ofs.y) + Point2(0, Math::floor((h - items[i].text_buf->get_size().y) / 2.0));
 				if (theme_cache.font_outline_size > 0 && theme_cache.font_outline_color.a > 0) {
 					items[i].text_buf->draw_outline(ci, text_pos, theme_cache.font_outline_size, theme_cache.font_outline_color);
 				}
 				items[i].text_buf->draw(ci, text_pos, items[i].disabled ? theme_cache.font_disabled_color : (i == mouse_over ? theme_cache.font_hover_color : theme_cache.font_color));
+			}
+
+			items.write[i]._ofs_cache = item_ofs.y;
+			items.write[i]._height_cache = h;
+			items.write[i]._width_cache = w;
+		}
+	} else {
+		float display_width = control->get_size().width;
+
+		float icon_ofs = 0.0;
+		bool has_check = false;
+		for (int i = 0; i < items.size(); i++) {
+			if (items[i].separator) {
+				continue;
+			}
+
+			Size2 icon_size = _get_item_icon_size(i);
+			icon_ofs = MAX(icon_size.width, icon_ofs);
+
+			if (items[i].checkable_type) {
+				has_check = true;
+			}
+		}
+		if (icon_ofs > 0.0) {
+			icon_ofs += theme_cache.h_separation;
+		}
+
+		float check_ofs = 0.0;
+		if (has_check) {
+			for (int i = 0; i < 4; i++) {
+				check_ofs = MAX(check_ofs, check[i]->get_width());
+				check_ofs = MAX(check_ofs, uncheck[i]->get_width());
+			}
+			check_ofs += theme_cache.h_separation;
+		}
+
+		Point2 ofs;
+
+		for (int i = 0; i < items.size(); i++) {
+			ofs.y += i > 0 ? theme_cache.v_separation : (float)theme_cache.v_separation / 2;
+
+			_shape_item(i);
+
+			Point2 item_ofs = ofs;
+			Size2 icon_size = _get_item_icon_size(i);
+			float h = _get_item_height(i);
+
+			if (i == mouse_over) {
+				theme_cache.hover_style->draw(ci, Rect2(item_ofs + Point2(0, -theme_cache.v_separation / 2), Size2(display_width, h + theme_cache.v_separation)));
+			}
+
+			String text = items[i].xl_text;
+
+			item_ofs.x += items[i].indent * theme_cache.indent;
+			if (items[i].separator) {
+				if (!text.is_empty() || items[i].icon.is_valid()) {
+					int content_size = items[i].text_buf->get_size().width + theme_cache.h_separation * 2;
+					if (items[i].icon.is_valid()) {
+						content_size += icon_size.width + theme_cache.h_separation;
+					}
+
+					int content_center = display_width / 2;
+					int content_left = content_center - content_size / 2;
+					int content_right = content_center + content_size / 2;
+					if (content_left > item_ofs.x) {
+						int sep_h = theme_cache.labeled_separator_left->get_minimum_size().height;
+						int sep_ofs = Math::floor((h - sep_h) / 2.0);
+						theme_cache.labeled_separator_left->draw(ci, Rect2(item_ofs + Point2(0, sep_ofs), Size2(MAX(0, content_left - item_ofs.x), sep_h)));
+					}
+					if (content_right < display_width) {
+						int sep_h = theme_cache.labeled_separator_right->get_minimum_size().height;
+						int sep_ofs = Math::floor((h - sep_h) / 2.0);
+						theme_cache.labeled_separator_right->draw(ci, Rect2(Point2(content_right, item_ofs.y + sep_ofs), Size2(MAX(0, display_width - content_right), sep_h)));
+					}
+				} else {
+					int sep_h = theme_cache.separator_style->get_minimum_size().height;
+					int sep_ofs = Math::floor((h - sep_h) / 2.0);
+					theme_cache.separator_style->draw(ci, Rect2(item_ofs + Point2(0, sep_ofs), Size2(display_width, sep_h)));
+				}
+			}
+
+			Color icon_color = items[i].icon_modulate;
+
+			if (!items[i].separator) {
+				item_ofs.x += theme_cache.item_start_padding;
+			}
+			if (items[i].checkable_type && !items[i].separator) {
+				int disabled = int(items[i].disabled) * 2;
+				Texture2D *icon = (items[i].checked ? check[items[i].checkable_type - 1 + disabled] : uncheck[items[i].checkable_type - 1 + disabled]).ptr();
+				if (rtl) {
+					icon->draw(ci, Size2(control->get_size().width - item_ofs.x - icon->get_width(), item_ofs.y) + Point2(0, Math::floor((h - icon->get_height()) / 2.0)), icon_color);
+				} else {
+					icon->draw(ci, item_ofs + Point2(0, Math::floor((h - icon->get_height()) / 2.0)), icon_color);
+				}
+			}
+
+			int separator_ofs = (display_width - items[i].text_buf->get_size().width) / 2;
+
+			if (items[i].icon.is_valid()) {
+				const Point2 icon_offset = Point2(0, Math::floor((h - icon_size.height) / 2.0));
+				Point2 icon_pos;
+
+				if (items[i].separator) {
+					separator_ofs -= (icon_size.width + theme_cache.h_separation) / 2;
+
+					if (rtl) {
+						icon_pos = Size2(control->get_size().width - item_ofs.x - separator_ofs - icon_size.width, item_ofs.y);
+					} else {
+						icon_pos = item_ofs + Size2(separator_ofs, 0);
+						separator_ofs += icon_size.width + theme_cache.h_separation;
+					}
+				} else {
+					if (rtl) {
+						icon_pos = Size2(control->get_size().width - item_ofs.x - check_ofs - icon_size.width, item_ofs.y);
+					} else {
+						icon_pos = item_ofs + Size2(check_ofs, 0);
+					}
+				}
+
+				items[i].icon->draw_rect(ci, Rect2(icon_pos + icon_offset, icon_size), false, icon_color);
+			}
+
+			if (items[i].submenu) {
+				if (rtl) {
+					submenu->draw(ci, Point2(theme_cache.panel_style->get_margin(SIDE_LEFT) + theme_cache.item_end_padding, item_ofs.y + Math::floor(h - submenu->get_height()) / 2), icon_color);
+				} else {
+					submenu->draw(ci, Point2(display_width - theme_cache.panel_style->get_margin(SIDE_RIGHT) - submenu->get_width() - theme_cache.item_end_padding, item_ofs.y + Math::floor(h - submenu->get_height()) / 2), icon_color);
+				}
+			}
+
+			if (items[i].separator) {
+				if (!text.is_empty()) {
+					Vector2 text_pos = Point2(separator_ofs, item_ofs.y + Math::floor((h - items[i].text_buf->get_size().y) / 2.0));
+
+					if (theme_cache.font_separator_outline_size > 0 && theme_cache.font_separator_outline_color.a > 0) {
+						items[i].text_buf->draw_outline(ci, text_pos, theme_cache.font_separator_outline_size, theme_cache.font_separator_outline_color);
+					}
+					items[i].text_buf->draw(ci, text_pos, theme_cache.font_separator_color);
+				}
 			} else {
+				item_ofs.x += icon_ofs + check_ofs;
+
+				if (rtl) {
+					Vector2 text_pos = Size2(control->get_size().width - items[i].text_buf->get_size().width - item_ofs.x, item_ofs.y) + Point2(0, Math::floor((h - items[i].text_buf->get_size().y) / 2.0));
+					if (theme_cache.font_outline_size > 0 && theme_cache.font_outline_color.a > 0) {
+						items[i].text_buf->draw_outline(ci, text_pos, theme_cache.font_outline_size, theme_cache.font_outline_color);
+					}
+					items[i].text_buf->draw(ci, text_pos, items[i].disabled ? theme_cache.font_disabled_color : (i == mouse_over ? theme_cache.font_hover_color : theme_cache.font_color));
+				} else {
+					Vector2 text_pos = item_ofs + Point2(0, Math::floor((h - items[i].text_buf->get_size().y) / 2.0));
+					if (theme_cache.font_outline_size > 0 && theme_cache.font_outline_color.a > 0) {
+						items[i].text_buf->draw_outline(ci, text_pos, theme_cache.font_outline_size, theme_cache.font_outline_color);
+					}
+					items[i].text_buf->draw(ci, text_pos, items[i].disabled ? theme_cache.font_disabled_color : (i == mouse_over ? theme_cache.font_hover_color : theme_cache.font_color));
+				}
+			}
+
+			if (items[i].accel != Key::NONE || (items[i].shortcut.is_valid() && items[i].shortcut->has_valid_event())) {
+				if (rtl) {
+					item_ofs.x = theme_cache.panel_style->get_margin(SIDE_LEFT) + theme_cache.item_end_padding;
+				} else {
+					item_ofs.x = display_width - theme_cache.panel_style->get_margin(SIDE_RIGHT) - items[i].accel_text_buf->get_size().x - theme_cache.item_end_padding;
+				}
 				Vector2 text_pos = item_ofs + Point2(0, Math::floor((h - items[i].text_buf->get_size().y) / 2.0));
 				if (theme_cache.font_outline_size > 0 && theme_cache.font_outline_color.a > 0) {
-					items[i].text_buf->draw_outline(ci, text_pos, theme_cache.font_outline_size, theme_cache.font_outline_color);
+					items[i].accel_text_buf->draw_outline(ci, text_pos, theme_cache.font_outline_size, theme_cache.font_outline_color);
 				}
-				items[i].text_buf->draw(ci, text_pos, items[i].disabled ? theme_cache.font_disabled_color : (i == mouse_over ? theme_cache.font_hover_color : theme_cache.font_color));
+				items[i].accel_text_buf->draw(ci, text_pos, i == mouse_over ? theme_cache.font_hover_color : theme_cache.font_accelerator_color);
 			}
+
+			items.write[i]._ofs_cache = ofs.y;
+			items.write[i]._height_cache = h;
+
+			ofs.y += h;
 		}
-
-		// Accelerator / Shortcut
-		if (items[i].accel != Key::NONE || (items[i].shortcut.is_valid() && items[i].shortcut->has_valid_event())) {
-			if (rtl) {
-				item_ofs.x = theme_cache.panel_style->get_margin(SIDE_LEFT) + theme_cache.item_end_padding;
-			} else {
-				item_ofs.x = display_width - theme_cache.panel_style->get_margin(SIDE_RIGHT) - items[i].accel_text_buf->get_size().x - theme_cache.item_end_padding;
-			}
-			Vector2 text_pos = item_ofs + Point2(0, Math::floor((h - items[i].text_buf->get_size().y) / 2.0));
-			if (theme_cache.font_outline_size > 0 && theme_cache.font_outline_color.a > 0) {
-				items[i].accel_text_buf->draw_outline(ci, text_pos, theme_cache.font_outline_size, theme_cache.font_outline_color);
-			}
-			items[i].accel_text_buf->draw(ci, text_pos, i == mouse_over ? theme_cache.font_hover_color : theme_cache.font_accelerator_color);
-		}
-
-		// Cache the item vertical offset from the first item and the height.
-		items.write[i]._ofs_cache = ofs.y;
-		items.write[i]._height_cache = h;
-
-		ofs.y += h;
 	}
 }
 
 void PopupMenu::_minimum_lifetime_timeout() {
 	close_allowed = true;
-	// If the mouse still isn't in this popup after timer expires, close.
 	if (!activated_by_keyboard && !get_visible_rect().has_point(get_mouse_position())) {
 		_close_pressed();
 	}
 }
 
 void PopupMenu::_close_pressed() {
-	// Only apply minimum lifetime to submenus.
 	PopupMenu *parent_pum = Object::cast_to<PopupMenu>(get_parent());
 	if (!parent_pum) {
 		Popup::_close_pressed();
 		return;
 	}
 
-	// If the timer has expired, close. If timer is still running, do nothing.
 	if (close_allowed) {
 		close_allowed = false;
 		Popup::_close_pressed();
@@ -2893,6 +3284,42 @@ bool PopupMenu::get_allow_search() const {
 	return allow_search;
 }
 
+void PopupMenu::set_use_grid_layout(bool p_use_grid) {
+	if (use_grid_layout != p_use_grid) {
+		use_grid_layout = p_use_grid;
+		control->queue_redraw();
+		child_controls_changed();
+		_menu_changed();
+	}
+}
+
+bool PopupMenu::get_use_grid_layout() const {
+	return use_grid_layout;
+}
+
+void PopupMenu::set_item_grid_position(int p_idx, int p_row, int p_column) {
+	ERR_FAIL_INDEX(p_idx, items.size());
+	items.write[p_idx]._grid_row = p_row;
+	items.write[p_idx]._grid_col = p_column;
+	if (use_grid_layout) {
+		control->queue_redraw();
+		child_controls_changed();
+		_menu_changed();
+	}
+}
+
+void PopupMenu::set_item_grid_position_by_id(int p_id, int p_row, int p_column) {
+	int idx = get_item_index(p_id);
+	if (idx != -1) {
+		set_item_grid_position(idx, p_row, p_column);
+	}
+}
+
+Vector2i PopupMenu::get_item_grid_position(int p_idx) const {
+	ERR_FAIL_INDEX_V(p_idx, items.size(), Vector2i());
+	return Vector2i(items[p_idx]._grid_col, items[p_idx]._grid_row);
+}
+
 String PopupMenu::get_tooltip(const Point2 &p_pos) const {
 	int over = _get_mouse_over(p_pos);
 	if (over < 0 || over >= items.size()) {
@@ -3080,6 +3507,13 @@ void PopupMenu::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_allow_search", "allow"), &PopupMenu::set_allow_search);
 	ClassDB::bind_method(D_METHOD("get_allow_search"), &PopupMenu::get_allow_search);
 
+	ClassDB::bind_method(D_METHOD("set_use_grid_layout", "use_grid"), &PopupMenu::set_use_grid_layout);
+	ClassDB::bind_method(D_METHOD("get_use_grid_layout"), &PopupMenu::get_use_grid_layout);
+
+	ClassDB::bind_method(D_METHOD("set_item_grid_position", "index", "row", "column"), &PopupMenu::set_item_grid_position);
+	ClassDB::bind_method(D_METHOD("set_item_grid_position_by_id", "id", "row", "column"), &PopupMenu::set_item_grid_position_by_id);
+	ClassDB::bind_method(D_METHOD("get_item_grid_position", "index"), &PopupMenu::get_item_grid_position);
+
 	ClassDB::bind_method(D_METHOD("is_system_menu"), &PopupMenu::is_system_menu);
 	ClassDB::bind_method(D_METHOD("set_system_menu", "system_menu_id"), &PopupMenu::set_system_menu);
 	ClassDB::bind_method(D_METHOD("get_system_menu"), &PopupMenu::get_system_menu);
@@ -3089,6 +3523,7 @@ void PopupMenu::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "hide_on_state_item_selection"), "set_hide_on_state_item_selection", "is_hide_on_state_item_selection");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "submenu_popup_delay", PROPERTY_HINT_NONE, "suffix:s"), "set_submenu_popup_delay", "get_submenu_popup_delay");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "allow_search"), "set_allow_search", "get_allow_search");
+	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "use_grid_layout"), "set_use_grid_layout", "get_use_grid_layout");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "system_menu_id", PROPERTY_HINT_ENUM, "None:0,Application Menu:2,Window Menu:3,Help Menu:4,Dock:5"), "set_system_menu", "get_system_menu");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "prefer_native_menu"), "set_prefer_native_menu", "is_prefer_native_menu");
 
@@ -3152,6 +3587,7 @@ void PopupMenu::_bind_methods() {
 	base_property_helper.register_property(PropertyInfo(Variant::INT, "id", PROPERTY_HINT_RANGE, "0,10,1,or_greater", PROPERTY_USAGE_DEFAULT | PROPERTY_USAGE_STORE_IF_NULL), defaults.id, &PopupMenu::set_item_id, &PopupMenu::get_item_id);
 	base_property_helper.register_property(PropertyInfo(Variant::BOOL, "disabled"), defaults.disabled, &PopupMenu::set_item_disabled, &PopupMenu::is_item_disabled);
 	base_property_helper.register_property(PropertyInfo(Variant::BOOL, "separator"), defaults.separator, &PopupMenu::set_item_as_separator, &PopupMenu::is_item_separator);
+	base_property_helper.register_property(PropertyInfo(Variant::VECTOR2I, "grid_position"), Vector2i(defaults._grid_row, defaults._grid_col), &PopupMenu::_set_item_grid_position_vector, &PopupMenu::_get_item_grid_position_vector);
 	PropertyListHelper::register_base_helper(&base_property_helper);
 }
 
@@ -3299,4 +3735,75 @@ PopupMenu::PopupMenu() {
 
 PopupMenu::~PopupMenu() {
 	unbind_global_menu();
+}
+
+PopupMenu::GridColumnInfo PopupMenu::_calculate_grid_layout_info() const {
+	GridColumnInfo info;
+
+	if (!use_grid_layout || items.is_empty()) {
+		return info;
+	}
+
+	int max_row = 0;
+	int max_col = 0;
+	float max_item_height = 0.0;
+
+	for (int i = 0; i < items.size(); i++) {
+		max_item_height = MAX(max_item_height, _get_item_height(i));
+		max_row = MAX(max_row, items[i]._grid_row);
+		max_col = MAX(max_col, items[i]._grid_col);
+	}
+
+	info.grid_columns = max_col + 1;
+	info.grid_rows = max_row + 1;
+	info.cell_height = max_item_height + theme_cache.v_separation;
+
+	info.column_widths.resize(info.grid_columns);
+	info.column_positions.resize(info.grid_columns + 1);
+	info.column_check_widths.resize(info.grid_columns);
+	info.column_icon_widths.resize(info.grid_columns);
+
+	info.column_widths.fill(0.0);
+	info.column_check_widths.fill(0.0);
+	info.column_icon_widths.fill(0.0);
+
+	// First pass: find maximum checkbox and icon widths per column
+	for (int i = 0; i < items.size(); i++) {
+		int col = items[i]._grid_col;
+		if (col >= 0 && col < info.grid_columns) {
+			if (items[i].checkable_type && !items[i].separator) {
+				float check_width = MAX(theme_cache.checked->get_width(), theme_cache.radio_checked->get_width()) + theme_cache.h_separation;
+				info.column_check_widths.write[col] = MAX(info.column_check_widths[col], check_width);
+			}
+
+			if (items[i].icon.is_valid()) {
+				Size2 icon_size = _get_item_icon_size(i);
+				float icon_width = icon_size.width + theme_cache.h_separation;
+				info.column_icon_widths.write[col] = MAX(info.column_icon_widths[col], icon_width);
+			}
+		}
+	}
+
+	// Second pass: calculate column widths
+	for (int i = 0; i < items.size(); i++) {
+		float item_width = _get_item_width(i);
+		float padded_width = item_width + theme_cache.item_start_padding + theme_cache.item_end_padding + theme_cache.h_separation * 6;
+
+		int col = items[i]._grid_col;
+		if (col >= 0 && col < info.grid_columns) {
+			info.column_widths.write[col] = MAX(info.column_widths[col], padded_width);
+		}
+	}
+
+	float current_x = 0.0;
+	for (int c = 0; c < info.grid_columns; c++) {
+		info.column_positions.write[c] = current_x;
+		current_x += info.column_widths[c];
+		if (c < info.grid_columns - 1) {
+			current_x += theme_cache.h_separation;
+		}
+	}
+	info.column_positions.write[info.grid_columns] = current_x;
+
+	return info;
 }

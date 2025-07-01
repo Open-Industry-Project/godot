@@ -78,6 +78,9 @@ class PopupMenu : public Popup {
 		Key accel = Key::NONE;
 		int _ofs_cache = 0;
 		int _height_cache = 0;
+		int _width_cache = 0;
+		int _grid_row = 0;
+		int _grid_col = 0;
 		int indent = 0;
 		Ref<Shortcut> shortcut;
 		bool shortcut_is_global = false;
@@ -134,6 +137,7 @@ class PopupMenu : public Popup {
 	virtual Size2 _get_contents_minimum_size() const override;
 
 	int _get_item_height(int p_idx) const;
+	int _get_item_width(int p_idx) const;
 	int _get_items_total_height() const;
 	Size2 _get_item_icon_size(int p_idx) const;
 
@@ -160,6 +164,8 @@ class PopupMenu : public Popup {
 	bool allow_search = true;
 	uint64_t search_time_msec = 0;
 	String search_string = "";
+
+	bool use_grid_layout = false; // Whether to use grid layout or traditional vertical layout
 
 	PanelContainer *panel = nullptr;
 	ScrollContainer *scroll_container = nullptr;
@@ -215,6 +221,18 @@ class PopupMenu : public Popup {
 
 	void _draw_items();
 
+	struct GridColumnInfo {
+		int grid_columns = 0;
+		int grid_rows = 0;
+		Vector<float> column_widths;
+		Vector<float> column_positions;
+		Vector<float> column_check_widths;
+		Vector<float> column_icon_widths;
+		float cell_height = 0;
+	};
+
+	GridColumnInfo _calculate_grid_layout_info() const;
+
 	void _minimum_lifetime_timeout();
 	void _close_pressed();
 	void _menu_changed();
@@ -222,6 +240,8 @@ class PopupMenu : public Popup {
 	bool _set_item_accelerator(int p_index, const Ref<InputEventKey> &p_ie);
 	void _set_item_checkable_type(int p_index, int p_checkable_type);
 	int _get_item_checkable_type(int p_index) const;
+	void _set_item_grid_position_vector(int p_index, const Vector2i &p_position);
+	Vector2i _get_item_grid_position_vector(int p_index) const;
 	void _native_popup(const Rect2i &p_rect);
 	String _atr(int p_idx, const String &p_text) const;
 
@@ -391,6 +411,13 @@ public:
 
 	void set_allow_search(bool p_allow);
 	bool get_allow_search() const;
+
+	void set_use_grid_layout(bool p_use_grid);
+	bool get_use_grid_layout() const;
+
+	void set_item_grid_position(int p_idx, int p_row, int p_column);
+	void set_item_grid_position_by_id(int p_id, int p_row, int p_column);
+	Vector2i get_item_grid_position(int p_idx) const;
 
 	virtual void popup(const Rect2i &p_bounds = Rect2i()) override;
 	virtual void set_visible(bool p_visible) override;
