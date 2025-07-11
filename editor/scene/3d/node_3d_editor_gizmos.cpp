@@ -1038,6 +1038,35 @@ Ref<StandardMaterial3D> EditorNode3DGizmoPlugin::get_material(const String &p_na
 	return mat;
 }
 
+void EditorNode3DGizmoPlugin::update_material_colors() {
+	const Color instantiated_color = EDITOR_GET("editors/3d_gizmos/gizmo_colors/instantiated");
+
+	for (KeyValue<String, Vector<Ref<StandardMaterial3D>>> &E : materials) {
+		Vector<Ref<StandardMaterial3D>> &mats = E.value;
+		if (mats.size() != 4) {
+			continue;
+		}
+
+		String setting_name = E.key.trim_suffix("_material");
+		if (!EditorSettings::get_singleton()->has_setting("editors/3d_gizmos/gizmo_colors/" + setting_name)) {
+			continue;
+		}
+
+		const Color base_color = EDITOR_GET("editors/3d_gizmos/gizmo_colors/" + setting_name);
+
+		// Update all 4 material variants: [unselected+instantiated, selected+instantiated, unselected+normal, selected+normal]
+		for (int i = 0; i < 4; i++) {
+			if (mats[i].is_valid()) {
+				Color color = (i < 2) ? instantiated_color : base_color;
+				if (i % 2 == 0) { // unselected variants
+					color.a *= 0.3;
+				}
+				mats[i]->set_albedo(color);
+			}
+		}
+	}
+}
+
 String EditorNode3DGizmoPlugin::get_gizmo_name() const {
 	String ret;
 	if (GDVIRTUAL_CALL(_get_gizmo_name, ret)) {

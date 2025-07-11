@@ -36,7 +36,7 @@
 #include "scene/3d/occluder_instance_3d.h"
 
 OccluderInstance3DGizmoPlugin::OccluderInstance3DGizmoPlugin() {
-	create_material("line_material", EDITOR_GET("editors/3d_gizmos/gizmo_colors/occluder"));
+	create_material("occluder_material", EDITOR_GET("editors/3d_gizmos/gizmo_colors/occluder"));
 	create_handle_material("handles");
 }
 
@@ -248,7 +248,7 @@ void OccluderInstance3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 
 	Vector<Vector3> lines = o->get_debug_lines();
 	if (!lines.is_empty()) {
-		Ref<Material> material = get_material("line_material", p_gizmo);
+		Ref<Material> material = get_material("occluder_material", p_gizmo);
 		p_gizmo->add_lines(lines, material);
 		p_gizmo->add_collision_segments(lines);
 	}

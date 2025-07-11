@@ -192,6 +192,7 @@ public:
 	void add_material(const String &p_name, Ref<StandardMaterial3D> p_material);
 
 	Ref<StandardMaterial3D> get_material(const String &p_name, const Ref<EditorNode3DGizmo> &p_gizmo = Ref<EditorNode3DGizmo>());
+	void update_material_colors();
 
 	virtual String get_gizmo_name() const;
 	virtual int get_priority() const;

@@ -8450,6 +8450,12 @@ void Node3DEditor::_notification(int p_what) {
 				_finish_grid();
 				_init_grid();
 			}
+
+			if (EditorSettings::get_singleton()->check_changed_settings_in_group("editors/3d_gizmos")) {
+				for (int i = 0; i < gizmo_plugins_by_priority.size(); i++) {
+					gizmo_plugins_by_priority[i]->update_material_colors();
+				}
+			}
 		} break;
 
 		case NOTIFICATION_PHYSICS_PROCESS: {
