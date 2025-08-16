@@ -146,6 +146,7 @@ void Camera3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 
 	Ref<Material> material = get_material("camera_material", p_gizmo);
 	Ref<Material> icon = get_material("camera_icon", p_gizmo);
+	Color gizmo_color = EDITOR_GET("editors/3d_gizmos/gizmo_colors/camera");
 
 	const Size2i viewport_size = Node3DEditor::get_camera_viewport_size(camera);
 	const real_t viewport_aspect = viewport_size.x > 0 && viewport_size.y > 0 ? viewport_size.aspect() : 1.0;
@@ -256,7 +257,9 @@ void Camera3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 #undef ADD_QUAD
 
 	p_gizmo->add_lines(lines, material);
-	p_gizmo->add_unscaled_billboard(icon, 0.05);
+	// Use same color for highlighted and selected states
+	Color icon_color = (p_gizmo->is_highlighted() || p_gizmo->is_selected()) ? gizmo_color : Color(1, 1, 1);
+	p_gizmo->add_unscaled_billboard(icon, 0.05, icon_color);
 	p_gizmo->add_collision_segments(lines);
 
 	if (!handles.is_empty()) {

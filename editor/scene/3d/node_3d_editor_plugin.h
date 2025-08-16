@@ -869,6 +869,7 @@ private:
 	void _request_gizmo_for_id(ObjectID p_id);
 	void _set_subgizmo_selection(Object *p_obj, Ref<Node3DGizmo> p_gizmo, int p_id, Transform3D p_transform = Transform3D());
 	void _clear_subgizmo_selection(Object *p_obj = nullptr);
+	void _update_all_gizmos(Node *p_node);
 
 	bool gizmos_dirty = false;
 

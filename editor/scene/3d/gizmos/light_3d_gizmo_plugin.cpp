@@ -193,7 +193,9 @@ void Light3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 		}
 
 		Ref<Material> icon = get_material("light_directional_icon", p_gizmo);
-		p_gizmo->add_unscaled_billboard(icon, 0.05, color);
+		// Use same color for highlighted and selected states
+		Color icon_color = (p_gizmo->is_highlighted() || p_gizmo->is_selected()) ? color : Color(1, 1, 1);
+		p_gizmo->add_unscaled_billboard(icon, 0.05, icon_color);
 	}
 
 	if (Object::cast_to<OmniLight3D>(light)) {
@@ -236,7 +238,9 @@ void Light3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 		}
 
 		const Ref<Material> icon = get_material("light_omni_icon", p_gizmo);
-		p_gizmo->add_unscaled_billboard(icon, 0.05, color);
+		// Use same color for highlighted and selected states
+		Color icon_color = (p_gizmo->is_highlighted() || p_gizmo->is_selected()) ? color : Color(1, 1, 1);
+		p_gizmo->add_unscaled_billboard(icon, 0.05, icon_color);
 	}
 
 	if (Object::cast_to<SpotLight3D>(light)) {
@@ -284,7 +288,9 @@ void Light3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 		}
 
 		const Ref<Material> icon = get_material("light_spot_icon", p_gizmo);
-		p_gizmo->add_unscaled_billboard(icon, 0.05, color);
+		// Use same color for highlighted and selected states
+		Color icon_color = (p_gizmo->is_highlighted() || p_gizmo->is_selected()) ? color : Color(1, 1, 1);
+		p_gizmo->add_unscaled_billboard(icon, 0.05, icon_color);
 	}
 }
 

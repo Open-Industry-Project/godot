@@ -6581,11 +6581,12 @@ void Node3DEditor::update_transform_gizmo() {
 	}
 }
 
-void _update_all_gizmos(Node *p_node) {
+void Node3DEditor::_update_all_gizmos(Node *p_node) {
 	for (int i = p_node->get_child_count() - 1; 0 <= i; --i) {
 		Node3D *spatial_node = Object::cast_to<Node3D>(p_node->get_child(i));
 		if (spatial_node) {
-			spatial_node->update_gizmos();
+			// Request gizmo to refresh selection state, not just visual update
+			_request_gizmo(spatial_node);
 		}
 
 		_update_all_gizmos(p_node->get_child(i));
@@ -8581,6 +8582,9 @@ void Node3DEditor::_selection_changed() {
 
 	update_outlines_all_viewports();
 
+	// Update all gizmos to reflect current selection state
+	update_all_gizmos();
+
 	for (const KeyValue<Node *, Object *> &E : selection) {
 		Node3D *sp = Object::cast_to<Node3D>(E.key);
 		if (!sp) {
@@ -8606,22 +8610,14 @@ void Node3DEditor::_selection_changed() {
 		}
 	}
 
+	// Handle single vs multi-selection for the "selected" pointer
 	if (selected && editor_selection->get_top_selected_node_list().size() != 1) {
-		Vector<Ref<Node3DGizmo>> gizmos = selected->get_gizmos();
-		for (int i = 0; i < gizmos.size(); i++) {
-			Ref<EditorNode3DGizmo> seg = gizmos[i];
-			if (seg.is_null()) {
-				continue;
-			}
-			seg->set_selected(false);
-		}
-
+		// Clear subgizmos for the previously single-selected node in multi-selection
 		Node3DEditorSelectedItem *se = editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(selected);
 		if (se) {
 			se->gizmo.unref();
 			se->subgizmos.clear();
 		}
-		selected->update_gizmos();
 		selected = nullptr;
 	}
 
@@ -9231,7 +9227,9 @@ void Node3DEditor::_request_gizmo(Object *p_obj) {
 		return;
 	}
 
-	bool is_selected = (sp == selected);
+	// Determine selection state: full selection for active node, highlight-only for multi-selected
+	bool is_active_selected = (sp == selected);
+	bool is_multi_selected = editor_selection->is_selected(sp) && !is_active_selected;
 
 	Node *edited_scene = EditorNode::get_singleton()->get_edited_scene();
 	if (edited_scene && (sp == edited_scene || (sp->get_owner() && edited_scene->is_ancestor_of(sp)))) {
@@ -9241,8 +9239,14 @@ void Node3DEditor::_request_gizmo(Object *p_obj) {
 			if (seg.is_valid()) {
 				sp->add_gizmo(seg);
 
-				if (is_selected != seg->is_selected()) {
-					seg->set_selected(is_selected);
+				// Update selection state
+				if (is_active_selected != seg->is_selected()) {
+					seg->set_selected(is_active_selected);
+				}
+
+				// Update highlight state for multi-selection
+				if (is_multi_selected != seg->is_highlighted()) {
+					seg->set_highlighted(is_multi_selected);
 				}
 			}
 		}
