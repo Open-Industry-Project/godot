@@ -782,6 +782,18 @@
 				[/codeblock]
 			</description>
 		</annotation>
+		<annotation name="@preserve">
+			<return type="void" />
+			<description>
+				Marks a non-static variable to preserve its current value during script hot-reload. When used in [annotation @tool] scripts with Auto-HMR enabled, variables without [annotation @preserve] are reinitialized on reload, while preserved variables keep their existing runtime values.
+				[codeblock]
+				@tool
+				var counter := 0
+				@preserve var selection := []
+				[/codeblock]
+				[b]Note:[/b] This annotation is only valid for non-static variables.
+			</description>
+		</annotation>
 		<annotation name="@rpc">
 			<return type="void" />
 			<param index="0" name="mode" type="String" default="&quot;authority&quot;" />

@@ -170,6 +170,8 @@ private:
 
 	GDScriptFunction *implicit_initializer = nullptr; // `@implicit_new()` special function.
 	GDScriptFunction *implicit_ready = nullptr; // `@implicit_ready()` special function.
+	GDScriptFunction *implicit_reload = nullptr; // `@implicit_reload()` special function.
+	GDScriptFunction *implicit_onready_rebind = nullptr; // `@implicit_onready_rebind()` special function.
 	GDScriptFunction *static_initializer = nullptr; // `@static_initializer()` special function.
 
 	Error _static_init();
@@ -270,6 +272,8 @@ public:
 
 	_FORCE_INLINE_ const GDScriptFunction *get_implicit_initializer() const { return implicit_initializer; }
 	_FORCE_INLINE_ const GDScriptFunction *get_implicit_ready() const { return implicit_ready; }
+	_FORCE_INLINE_ const GDScriptFunction *get_implicit_reload() const { return implicit_reload; }
+	_FORCE_INLINE_ const GDScriptFunction *get_implicit_onready_rebind() const { return implicit_onready_rebind; }
 	_FORCE_INLINE_ const GDScriptFunction *get_static_initializer() const { return static_initializer; }
 
 	RBSet<GDScript *> get_dependencies();
@@ -643,6 +647,12 @@ public:
 	virtual void reload_all_scripts() override;
 	virtual void reload_scripts(const Array &p_scripts, bool p_soft_reload) override;
 	virtual void reload_tool_script(const Ref<Script> &p_script, bool p_soft_reload) override;
+
+#ifdef TOOLS_ENABLED
+	bool _hmr_rebind_pending = false;
+	void _post_hmr_rebind_onready();
+	void _rebind_single_instance(const String &p_script_path, ObjectID p_owner_id);
+#endif
 
 	virtual void frame() override;
 

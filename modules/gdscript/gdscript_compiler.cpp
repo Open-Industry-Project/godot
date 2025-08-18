@@ -2289,7 +2289,7 @@ Error GDScriptCompiler::_parse_block(CodeGen &codegen, const GDScriptParser::Sui
 	return OK;
 }
 
-GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_script, const GDScriptParser::ClassNode *p_class, const GDScriptParser::FunctionNode *p_func, bool p_for_ready, bool p_for_lambda) {
+GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_script, const GDScriptParser::ClassNode *p_class, const GDScriptParser::FunctionNode *p_func, bool p_for_ready, bool p_for_lambda, bool p_for_reload, bool p_for_onready_rebind) {
 	r_error = OK;
 	CodeGen codegen;
 	codegen.generator = memnew(GDScriptByteCodeGenerator);
@@ -2320,6 +2320,10 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 	} else {
 		if (p_for_ready) {
 			func_name = "@implicit_ready";
+		} else if (p_for_reload) {
+			func_name = "@implicit_reload";
+		} else if (p_for_onready_rebind) {
+			func_name = "@implicit_onready_rebind";
 		} else {
 			func_name = "@implicit_new";
 		}
@@ -2364,9 +2368,11 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 	}
 
 	// Parse initializer if applies.
-	bool is_implicit_initializer = !p_for_ready && !p_func && !p_for_lambda;
+	bool is_implicit_initializer = !p_for_ready && !p_func && !p_for_lambda && !p_for_reload && !p_for_onready_rebind;
 	bool is_initializer = p_func && !p_for_lambda && p_func->identifier->name == GDScriptLanguage::get_singleton()->strings._init;
 	bool is_implicit_ready = !p_func && p_for_ready;
+	bool is_implicit_reload = !p_func && p_for_reload;
+	bool is_implicit_onready_rebind = !p_func && p_for_onready_rebind;
 
 	if (!p_for_lambda && is_implicit_initializer) {
 		// Initialize the default values for typed variables before anything.
@@ -2401,7 +2407,7 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 		}
 	}
 
-	if (!p_for_lambda && (is_implicit_initializer || is_implicit_ready)) {
+	if (!p_for_lambda && (is_implicit_initializer || is_implicit_ready || is_implicit_reload || is_implicit_onready_rebind)) {
 		// Initialize class fields.
 		for (int i = 0; i < p_class->members.size(); i++) {
 			if (p_class->members[i].type != GDScriptParser::ClassNode::Member::VARIABLE) {
@@ -2412,9 +2418,32 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 				continue;
 			}
 
-			if (field->onready != is_implicit_ready) {
-				// Only initialize in `@implicit_ready()`.
-				continue;
+			// Auto-HMR for tool scripts: initialize all non-static variables in @implicit_ready and @implicit_reload.
+			bool auto_hmr_enabled = p_script->is_tool() && (bool)GLOBAL_GET("gdscript/tool_scripts/auto_hmr_variables");
+
+			if (is_implicit_ready) {
+				if (!(field->onready || (auto_hmr_enabled && !field->is_static))) {
+					continue;
+				}
+			} else if (is_implicit_reload) {
+				// Skip @onready on reload; they rebind after tree is stable in deferred pass.
+				if (!(auto_hmr_enabled && !field->is_static && !field->onready)) {
+					continue;
+				}
+				if (field->preserve) {
+					continue; // Respect @preserve on reload.
+				}
+			} else if (is_implicit_onready_rebind) {
+				// Only rebind @onready fields in the deferred pass.
+				if (!field->onready) {
+					continue;
+				}
+			} else if (is_implicit_initializer) {
+				// Skip @onready variables in constructor - they initialize in @implicit_ready.
+				// Also skip non-@onready variables if auto-HMR will handle them in @implicit_ready.
+				if (field->onready || (auto_hmr_enabled && !field->is_static)) {
+					continue;
+				}
 			}
 
 			if (field->initializer) {
@@ -2513,6 +2542,10 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 		p_script->implicit_initializer = gd_function;
 	} else if (is_implicit_ready) {
 		p_script->implicit_ready = gd_function;
+	} else if (is_implicit_reload) {
+		p_script->implicit_reload = gd_function;
+	} else if (is_implicit_onready_rebind) {
+		p_script->implicit_onready_rebind = gd_function;
 	}
 
 	if (p_func) {
@@ -2534,7 +2567,7 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 
 	gd_function->method_info = method_info;
 
-	if (!is_implicit_initializer && !is_implicit_ready && !p_for_lambda) {
+	if (!is_implicit_initializer && !is_implicit_ready && !is_implicit_reload && !is_implicit_onready_rebind && !p_for_lambda) {
 		p_script->member_functions[func_name] = gd_function;
 	}
 
@@ -2744,6 +2777,12 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 	if (p_script->implicit_ready) {
 		memdelete(p_script->implicit_ready);
 	}
+	if (p_script->implicit_reload) {
+		memdelete(p_script->implicit_reload);
+	}
+	if (p_script->implicit_onready_rebind) {
+		memdelete(p_script->implicit_onready_rebind);
+	}
 	if (p_script->static_initializer) {
 		memdelete(p_script->static_initializer);
 	}
@@ -2756,6 +2795,8 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 	p_script->initializer = nullptr;
 	p_script->implicit_initializer = nullptr;
 	p_script->implicit_ready = nullptr;
+	p_script->implicit_reload = nullptr;
+	p_script->implicit_onready_rebind = nullptr;
 	p_script->static_initializer = nullptr;
 	p_script->rpc_config.clear();
 	p_script->lambda_info.clear();
@@ -2848,6 +2889,9 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 			case GDScriptParser::ClassNode::Member::VARIABLE: {
 				const GDScriptParser::VariableNode *variable = member.variable;
 				StringName name = variable->identifier->name;
+
+				// DEBUG: Log variable registration
+				print_verbose("GDScript: Registering variable '" + String(name) + "' - onready: " + (variable->onready ? "true" : "false") + ", static: " + (variable->is_static ? "true" : "false"));
 
 				GDScript::MemberInfo minfo;
 				switch (variable->property) {
@@ -3035,12 +3079,39 @@ Error GDScriptCompiler::_compile_class(GDScript *p_script, const GDScriptParser:
 		}
 	}
 
-	if (p_class->onready_used) {
-		// Create `@implicit_ready()` special function.
-		Error err = OK;
-		_parse_function(err, p_script, p_class, nullptr, true);
-		if (err) {
-			return err;
+	// Auto-HMR: generate @implicit_ready() for tool scripts or when @onready is used.
+	{
+		bool auto_hmr_enabled = p_script->is_tool() && (bool)GLOBAL_GET("gdscript/tool_scripts/auto_hmr_variables");
+		if (p_class->onready_used || auto_hmr_enabled) {
+			Error err = OK;
+			_parse_function(err, p_script, p_class, nullptr, true);
+			if (err) {
+				return err;
+			}
+		}
+	}
+
+	// Auto-HMR: always generate @implicit_reload() for tool scripts.
+	{
+		bool auto_hmr_enabled = p_script->is_tool() && (bool)GLOBAL_GET("gdscript/tool_scripts/auto_hmr_variables");
+		if (auto_hmr_enabled) {
+			Error err = OK;
+			_parse_function(err, p_script, p_class, nullptr, false, false, true);
+			if (err) {
+				return err;
+			}
+		}
+	}
+
+	// Auto-HMR: generate @implicit_onready_rebind() for tool scripts with @onready variables.
+	{
+		bool auto_hmr_enabled = p_script->is_tool() && (bool)GLOBAL_GET("gdscript/tool_scripts/auto_hmr_variables");
+		if (auto_hmr_enabled && p_class->onready_used) {
+			Error err = OK;
+			_parse_function(err, p_script, p_class, nullptr, false, false, false, true);
+			if (err) {
+				return err;
+			}
 		}
 	}
 
@@ -3095,6 +3166,17 @@ Error GDScriptCompiler::_compile_class(GDScript *p_script, const GDScriptParser:
 			} else {
 				GDScriptInstance *gi = static_cast<GDScriptInstance *>(si);
 				gi->reload_members();
+
+				// DEBUG: Log reload_members call
+				print_verbose("GDScript: reload_members() called for script: " + p_script->get_script_path());
+
+				// Auto-HMR: after reloading members, re-run implicit reload to reinitialize non-preserved variables.
+				bool auto_hmr_enabled = p_script->is_tool() && (bool)GLOBAL_GET("gdscript/tool_scripts/auto_hmr_variables");
+				if (auto_hmr_enabled && p_script->implicit_reload) {
+					print_verbose("GDScript: Calling @implicit_reload for: " + p_script->get_script_path());
+					Callable::CallError ce2;
+					p_script->implicit_reload->call(gi, nullptr, 0, ce2);
+				}
 			}
 
 			E = N;
@@ -3227,6 +3309,7 @@ GDScriptCompiler::ScriptLambdaInfo GDScriptCompiler::_get_script_lambda_replacem
 	if (p_script->implicit_ready) {
 		info.implicit_ready_info = _get_function_lambda_replacement_info(p_script->implicit_ready);
 	}
+	// implicit_reload does not carry lambdas by design; no tracking needed.
 	if (p_script->static_initializer) {
 		info.static_initializer_info = _get_function_lambda_replacement_info(p_script->static_initializer);
 	}

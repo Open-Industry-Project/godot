@@ -2531,6 +2531,88 @@ struct GDScriptDepSort {
 	}
 };
 
+#ifdef TOOLS_ENABLED
+void GDScriptLanguage::_post_hmr_rebind_onready() {
+#ifdef DEBUG_ENABLED
+	print_verbose("GDScript: Starting post-HMR @onready rebind pass");
+	_hmr_rebind_pending = false; // Reset flag for next coalescing cycle.
+
+	MutexLock lock(mutex);
+
+	// Collect all tool scripts with onready rebind functions.
+	Vector<Ref<GDScript>> scripts_to_rebind;
+	SelfList<GDScript> *elem = script_list.first();
+	while (elem) {
+		GDScript *scr = elem->self();
+		if (scr->is_tool() && scr->get_implicit_onready_rebind()) {
+			print_verbose("GDScript: Found tool script with @onready rebind: " + scr->get_script_path());
+			scripts_to_rebind.push_back(Ref<GDScript>(scr));
+		}
+		elem = elem->next();
+	}
+
+	// Process in dependency order (parents before children for scene tree stability).
+	scripts_to_rebind.sort_custom<GDScriptDepSort>();
+
+	for (const Ref<GDScript> &ref_scr : scripts_to_rebind) {
+		GDScript *scr = ref_scr.ptr();
+		for (RBSet<Object *>::Element *E = scr->instances.front(); E; E = E->next()) {
+			ScriptInstance *si = E->get()->get_script_instance();
+			if (si && !si->is_placeholder()) {
+				// Wait one more frame to ensure scene tree is fully ready.
+				Object *owner = si->get_owner();
+				if (Node *node = Object::cast_to<Node>(owner)) {
+					if (node->is_inside_tree() && node->is_ready()) {
+						print_verbose("GDScript: Rebinding @onready for node: " + node->get_name() + " (" + scr->get_script_path() + ")");
+						Callable::CallError ce;
+						const_cast<GDScriptFunction *>(scr->get_implicit_onready_rebind())->call(static_cast<GDScriptInstance *>(si), nullptr, 0, ce);
+						if (ce.error != Callable::CallError::CALL_OK) {
+							print_verbose("GDScript: @onready rebind failed with error: " + itos(ce.error));
+						}
+					} else {
+						print_verbose("GDScript: Node not ready yet, deferring rebind: " + node->get_name());
+						// Node not ready yet, defer further.
+						ObjectID owner_id = owner->get_instance_id();
+						String script_path = scr->get_script_path();
+						callable_mp(this, &GDScriptLanguage::_rebind_single_instance).call_deferred(script_path, owner_id);
+					}
+				}
+			}
+		}
+	}
+#endif
+}
+
+void GDScriptLanguage::_rebind_single_instance(const String &p_script_path, ObjectID p_owner_id) {
+#ifdef DEBUG_ENABLED
+	Object *owner = ObjectDB::get_instance(p_owner_id);
+	if (!owner) {
+		return; // Object was deleted.
+	}
+
+	ScriptInstance *si = owner->get_script_instance();
+	if (!si || si->is_placeholder()) {
+		return; // No script instance or placeholder.
+	}
+
+		Ref<GDScript> gd_script = si->get_script();
+	if (gd_script.is_null() || !gd_script->is_tool() || !gd_script->get_implicit_onready_rebind()) {
+		return; // Not a tool script or no rebind function.
+	}
+
+	if (Node *node = Object::cast_to<Node>(owner)) {
+		if (node->is_inside_tree() && node->is_ready()) {
+			Callable::CallError ce;
+			const_cast<GDScriptFunction *>(gd_script->get_implicit_onready_rebind())->call(static_cast<GDScriptInstance *>(si), nullptr, 0, ce);
+		} else {
+			// Still not ready, try again next frame.
+			callable_mp(this, &GDScriptLanguage::_rebind_single_instance).call_deferred(p_script_path, p_owner_id);
+		}
+	}
+#endif
+}
+#endif
+
 void GDScriptLanguage::reload_all_scripts() {
 #ifdef DEBUG_ENABLED
 	print_verbose("GDScript: Reloading all scripts");
@@ -2699,6 +2781,14 @@ void GDScriptLanguage::reload_scripts(const Array &p_scripts, bool p_soft_reload
 
 		//if instance states were saved, set them!
 	}
+
+#ifdef TOOLS_ENABLED
+	// Post-HMR deferred rebind for @onready: schedule for next frame in editor (coalesced).
+	if (p_soft_reload && !_hmr_rebind_pending) {
+		_hmr_rebind_pending = true;
+		callable_mp(this, &GDScriptLanguage::_post_hmr_rebind_onready).call_deferred();
+	}
+#endif
 
 #endif // DEBUG_ENABLED
 }
@@ -2967,6 +3057,9 @@ GDScriptLanguage::GDScriptLanguage() {
 	GLOBAL_DEF("debug/gdscript/warnings/enable", true);
 	GLOBAL_DEF("debug/gdscript/warnings/exclude_addons", true);
 	GLOBAL_DEF("debug/gdscript/warnings/renamed_in_godot_4_hint", true);
+
+	// Auto HMR for tool scripts setting
+	GLOBAL_DEF("gdscript/tool_scripts/auto_hmr_variables", true);
 	for (int i = 0; i < (int)GDScriptWarning::WARNING_MAX; i++) {
 		GDScriptWarning::Code code = (GDScriptWarning::Code)i;
 		Variant default_enabled = GDScriptWarning::get_default_value(code);

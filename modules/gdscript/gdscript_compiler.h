@@ -155,7 +155,7 @@ class GDScriptCompiler {
 	List<GDScriptCodeGenerator::Address> _add_block_locals(CodeGen &codegen, const GDScriptParser::SuiteNode *p_block);
 	void _clear_block_locals(CodeGen &codegen, const List<GDScriptCodeGenerator::Address> &p_locals);
 	Error _parse_block(CodeGen &codegen, const GDScriptParser::SuiteNode *p_block, bool p_add_locals = true, bool p_clear_locals = true);
-	GDScriptFunction *_parse_function(Error &r_error, GDScript *p_script, const GDScriptParser::ClassNode *p_class, const GDScriptParser::FunctionNode *p_func, bool p_for_ready = false, bool p_for_lambda = false);
+	GDScriptFunction *_parse_function(Error &r_error, GDScript *p_script, const GDScriptParser::ClassNode *p_class, const GDScriptParser::FunctionNode *p_func, bool p_for_ready = false, bool p_for_lambda = false, bool p_for_reload = false, bool p_for_onready_rebind = false);
 	GDScriptFunction *_make_static_initializer(Error &r_error, GDScript *p_script, const GDScriptParser::ClassNode *p_class);
 	Error _parse_setter_getter(GDScript *p_script, const GDScriptParser::ClassNode *p_class, const GDScriptParser::VariableNode *p_variable, bool p_is_setter);
 	Error _prepare_compilation(GDScript *p_script, const GDScriptParser::ClassNode *p_class, bool p_keep_state);
