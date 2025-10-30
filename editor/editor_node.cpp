@@ -8293,6 +8293,7 @@ void EditorNode::_update_main_menu_type() {
 		}
 	} else {
 		main_menu_bar = memnew(MenuBar);
+		main_menu_bar->set_name("MainMenuBar");
 		main_menu_bar->set_mouse_filter(Control::MOUSE_FILTER_STOP);
 		main_menu_bar->set_v_size_flags(Control::SIZE_SHRINK_CENTER);
 		main_menu_bar->set_theme_type_variation("MainMenuBar");
@@ -8705,6 +8706,7 @@ EditorNode::EditorNode() {
 	base_vbox->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT, Control::PRESET_MODE_MINSIZE, theme->get_constant(SNAME("window_border_margin"), EditorStringName(Editor)));
 
 	title_bar = memnew(EditorTitleBar);
+	title_bar->set_name("EditorTitleBar");
 	base_vbox->add_child(title_bar);
 
 	main_hbox = memnew(HBoxContainer);
@@ -8720,6 +8722,7 @@ EditorNode::EditorNode() {
 	gui_base->add_child(main_vbox);
 
 	title_bar = memnew(EditorTitleBar);
+	title_bar->set_name("EditorTitleBar");
 	main_vbox->add_child(title_bar);
 #endif
 
@@ -9114,12 +9117,14 @@ EditorNode::EditorNode() {
 	title_bar->add_child(right_spacer);
 
 	project_run_bar = memnew(EditorRunBar);
+	project_run_bar->set_name("EditorRunBar");
 	project_run_bar->set_mouse_filter(Control::MOUSE_FILTER_STOP);
 	title_bar->add_child(project_run_bar);
 	project_run_bar->connect("play_pressed", callable_mp(this, &EditorNode::_project_run_started));
 	project_run_bar->connect("stop_pressed", callable_mp(this, &EditorNode::_project_run_stopped));
 
 	right_menu_hb = memnew(HBoxContainer);
+	right_menu_hb->set_name("RendererSelection");
 	right_menu_hb->set_mouse_filter(Control::MOUSE_FILTER_STOP);
 	title_bar->add_child(right_menu_hb);
 

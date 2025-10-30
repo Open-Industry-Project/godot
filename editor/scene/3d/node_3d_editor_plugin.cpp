@@ -6932,6 +6932,7 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	vbox->add_child(hbox);
 
 	view_display_menu = memnew(MenuButton);
+	view_display_menu->set_name("ViewDisplayMenu");
 	view_display_menu->set_flat(false);
 	view_display_menu->set_h_size_flags(0);
 	view_display_menu->set_shortcut_context(this);

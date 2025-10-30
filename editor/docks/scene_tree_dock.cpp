@@ -1734,6 +1734,7 @@ void SceneTreeDock::_notification(int p_what) {
 			node_shortcuts->set_h_size_flags(SIZE_EXPAND_FILL);
 
 			beginner_node_shortcuts = memnew(VBoxContainer);
+			beginner_node_shortcuts->set_name("BeginnerNodeShortcuts");
 			node_shortcuts->add_child(beginner_node_shortcuts);
 
 			button_2d = memnew(Button);
