@@ -531,6 +531,7 @@ EditorLog::EditorLog() {
 
 	// Clear.
 	clear_button = memnew(Button);
+	clear_button->set_name("ClearOutputButton");
 	clear_button->set_accessibility_name(TTRC("Clear Log"));
 	clear_button->set_theme_type_variation("BottomPanelButton");
 	clear_button->set_focus_mode(FOCUS_ACCESSIBILITY);
