@@ -355,6 +355,8 @@ void EditorSettingsDialog::_update_builtin_action(const String &p_name, const Ar
 	undo_redo->add_undo_method(EditorSettings::get_singleton(), "mark_setting_changed", "builtin_action_overrides");
 	undo_redo->add_do_method(EditorSettings::get_singleton(), "set_builtin_action_override", p_name, p_events);
 	undo_redo->add_undo_method(EditorSettings::get_singleton(), "set_builtin_action_override", p_name, old_input_array);
+	undo_redo->add_do_method(EditorSettings::get_singleton(), "emit_signal", "settings_changed");
+	undo_redo->add_undo_method(EditorSettings::get_singleton(), "emit_signal", "settings_changed");
 	undo_redo->add_do_method(this, "_update_shortcuts");
 	undo_redo->add_undo_method(this, "_update_shortcuts");
 	undo_redo->add_do_method(this, "_settings_changed");
@@ -374,6 +376,8 @@ void EditorSettingsDialog::_update_shortcut_events(const String &p_path, const A
 	undo_redo->add_undo_method(current_sc.ptr(), "set_events", current_sc->get_events());
 	undo_redo->add_do_method(EditorSettings::get_singleton(), "mark_setting_changed", "shortcuts");
 	undo_redo->add_undo_method(EditorSettings::get_singleton(), "mark_setting_changed", "shortcuts");
+	undo_redo->add_do_method(EditorSettings::get_singleton(), "emit_signal", "settings_changed");
+	undo_redo->add_undo_method(EditorSettings::get_singleton(), "emit_signal", "settings_changed");
 	undo_redo->add_do_method(this, "_update_shortcuts");
 	undo_redo->add_undo_method(this, "_update_shortcuts");
 	undo_redo->add_do_method(this, "_settings_changed");
