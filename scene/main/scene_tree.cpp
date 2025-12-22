@@ -1153,18 +1153,12 @@ void SceneTree::_on_simulation_started() {
 #ifndef PHYSICS_3D_DISABLED
 	PhysicsServer3D::get_singleton()->set_active(true);
 #endif // PHYSICS_3D_DISABLED
-#ifndef PHYSICS_2D_DISABLED
-	PhysicsServer2D::get_singleton()->set_active(true);
-#endif // PHYSICS_2D_DISABLED
 }
 
 void SceneTree::_on_simulation_stopped() {
 #ifndef PHYSICS_3D_DISABLED
 	PhysicsServer3D::get_singleton()->set_active(false);
 #endif // PHYSICS_3D_DISABLED
-#ifndef PHYSICS_2D_DISABLED
-	PhysicsServer2D::get_singleton()->set_active(false);
-#endif // PHYSICS_2D_DISABLED
 }
 
 void SceneTree::set_suspend(bool p_enabled) {

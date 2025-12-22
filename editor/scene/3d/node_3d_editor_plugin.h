@@ -49,6 +49,7 @@ class ConfirmationDialog;
 class DirectionalLight3D;
 class EditorData;
 class EditorSelection;
+class EditorSelectionOutlineCapture;
 class EditorSpinSlider;
 class HSplitContainer;
 class LineEdit;
@@ -69,6 +70,7 @@ class VSplitContainer;
 class ViewportNavigationControl;
 class WorldEnvironment;
 class MeshInstance3D;
+class GeometryInstance3D;
 
 class ViewportRotationControl : public Control {
 	GDCLASS(ViewportRotationControl, Control);
@@ -117,6 +119,7 @@ class Node3DEditorViewport : public Control {
 	friend class Node3DEditor;
 	friend class ViewportNavigationControl;
 	friend class ViewportRotationControl;
+
 	enum {
 		VIEW_TOP,
 		VIEW_BOTTOM,
@@ -249,6 +252,8 @@ private:
 	SubViewport *viewport = nullptr;
 	Camera3D *camera = nullptr;
 	TextureRect *preview_2d_overlay = nullptr;
+	TextureRect *selection_outline_overlay = nullptr;
+	Ref<EditorSelectionOutlineCapture> selection_outline_capture;
 	bool transforming = false;
 	bool transform_gizmo_visible = true;
 	bool collision_reposition = false;
@@ -546,6 +551,8 @@ protected:
 public:
 	void update_surface() { surface->queue_redraw(); }
 	void update_transform_gizmo_view();
+	void update_selection_outline_overlay();
+	void update_selection_outline_overlay_visibility();
 	void update_transform_gizmo_highlight();
 
 	void set_can_preview(Camera3D *p_preview);
@@ -871,6 +878,37 @@ private:
 	void _clear_subgizmo_selection(Object *p_obj = nullptr);
 
 	bool gizmos_dirty = false;
+	HashSet<ObjectID> previous_selection;
+	void _update_gizmo_selection_state(Node3D *p_node);
+
+	struct OutlineCacheEntry {
+		Vector<RID> instances;
+		Vector<RID> base_rids;
+		Vector<ObjectID> geometry_ids;
+		Vector<Transform3D> last_xforms;
+		bool is_active = false;
+		bool is_visible = false;
+	};
+
+	HashMap<ObjectID, OutlineCacheEntry> outline_cache;
+	bool outline_update_pending = false;
+	bool outline_active = false;
+	uint64_t outline_sync_frame = 0;
+	// Index 0 is used for selected nodes, index 1 for the active node.
+	Ref<ShaderMaterial> outline_mask_material[2];
+	Ref<ShaderMaterial> outline_mask_visible_material[2];
+	Ref<ShaderMaterial> outline_draw_material[2];
+	Ref<ShaderMaterial> outline_overlay_material;
+
+	void _ensure_outline_materials();
+	void _update_outline_material_parameters();
+	void _deferred_update_outlines();
+	void _update_outlines();
+	void _create_outline_instances(Node3D *p_node, bool p_is_active);
+	bool _selected_node_has_outline(Node3D *p_node) const;
+	void _clear_outlines();
+	void _clear_cached_outline_for_node(Node3D *p_node);
+	static void _find_geometry_instances_recursive(Node *p_node, List<GeometryInstance3D *> &r_list);
 
 	static Node3DEditor *singleton;
 
@@ -987,6 +1025,8 @@ public:
 
 	Dictionary transform_gizmo_data;
 
+	bool outline_enabled = true;
+
 	static Size2i get_camera_viewport_size(Camera3D *p_camera);
 
 	Vector3 snap_point(Vector3 p_target, Vector3 p_start = Vector3(0, 0, 0)) const;
@@ -1023,6 +1063,11 @@ public:
 	void update_transform_gizmo();
 	void update_all_gizmos(Node *p_node = nullptr);
 	void update_gizmo_opacity();
+	void update_selection_outlines();
+	void sync_outline_transforms();
+	void update_selected_item_aabb(Node3D *p_node);
+	bool is_selection_outline_active() const { return outline_active; }
+	Ref<ShaderMaterial> get_selection_outline_overlay_material();
 	void snap_selected_nodes_to_floor();
 	void select_gizmo_highlight_axis(int p_axis);
 	void set_custom_camera(Node *p_camera) { custom_camera = p_camera; }

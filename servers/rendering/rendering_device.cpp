@@ -6088,7 +6088,7 @@ void RenderingDevice::draw_list_draw(DrawListID p_list, bool p_use_indices, uint
 				}
 
 				UniformSet *uniform_set = uniform_set_owner.get_or_null(draw_list.state.sets[i].uniform_set);
-				ERR_FAIL_NULL(uniform_set);
+				ERR_FAIL_NULL_MSG(uniform_set, vformat("Uniform set bound to slot %d (of %d) was freed before drawing (RID %d). Pipeline shader expects the following bindings:\n%s", i, draw_list.state.set_count, (int64_t)draw_list.state.sets[i].uniform_set.get_id(), _shader_uniform_debug(draw_list.state.pipeline_shader)));
 				_uniform_set_update_shared(uniform_set);
 				_uniform_set_update_clears(uniform_set);
 

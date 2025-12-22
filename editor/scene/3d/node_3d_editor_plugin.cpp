@@ -53,6 +53,7 @@
 #include "editor/gui/editor_spin_slider.h"
 #include "editor/plugins/editor_plugin_list.h"
 #include "editor/run/editor_run_bar.h"
+#include "editor/scene/3d/editor_selection_outline_capture.h"
 #include "editor/scene/3d/gizmos/audio_listener_3d_gizmo_plugin.h"
 #include "editor/scene/3d/gizmos/audio_stream_player_3d_gizmo_plugin.h"
 #include "editor/scene/3d/gizmos/camera_3d_gizmo_plugin.h"
@@ -93,7 +94,9 @@
 #include "editor/translations/editor_translation_preview_menu.h"
 #include "scene/3d/audio_stream_player_3d.h"
 #include "scene/3d/camera_3d.h"
+#include "scene/3d/cpu_particles_3d.h"
 #include "scene/3d/decal.h"
+#include "scene/3d/gpu_particles_3d.h"
 #include "scene/3d/light_3d.h"
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/3d/physics/collision_shape_3d.h"
@@ -112,7 +115,10 @@
 #include "scene/gui/texture_rect.h"
 #include "scene/main/scene_tree.h"
 #include "scene/resources/3d/sky_material.h"
+#include "scene/resources/compositor.h"
+#include "scene/resources/environment.h"
 #include "scene/resources/packed_scene.h"
+#include "scene/resources/shader.h"
 #include "scene/resources/sky.h"
 #include "scene/resources/surface_tool.h"
 #include "scene/resources/world_2d.h"
@@ -3807,35 +3813,16 @@ void Node3DEditorViewport::_notification(int p_what) {
 				se->last_xform_dirty = false;
 				se->last_xform = t;
 
-				se->aabb = new_aabb;
-
-				Transform3D t_offset = t;
-
-				// apply AABB scaling before item's global transform
-				{
-					const Vector3 offset(0.005, 0.005, 0.005);
-					Basis aabb_s;
-					aabb_s.scale(se->aabb.size + offset);
-					t.translate_local(se->aabb.position - offset / 2);
-					t.basis = t.basis * aabb_s;
-				}
-				{
-					const Vector3 offset(0.01, 0.01, 0.01);
-					Basis aabb_s;
-					aabb_s.scale(se->aabb.size + offset);
-					t_offset.translate_local(se->aabb.position - offset / 2);
-					t_offset.basis = t_offset.basis * aabb_s;
-				}
-
-				RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance, t);
-				RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance_offset, t_offset);
-				RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance_xray, t);
-				RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance_xray_offset, t_offset);
+				spatial_editor->update_selected_item_aabb(sp);
 			}
 
 			if (changed || (spatial_editor->is_gizmo_visible() && !exist)) {
 				spatial_editor->update_transform_gizmo();
 			}
+
+			spatial_editor->sync_outline_transforms();
+
+			update_selection_outline_overlay_visibility();
 
 			if (message_time > 0) {
 				if (message != last_message) {
@@ -5004,7 +4991,6 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 			}
 			camera->set_cull_mask(layers);
 			view_display_menu->get_popup()->set_item_checked(idx, current);
-
 		} break;
 		case VIEW_TRANSFORM_GIZMO: {
 			int idx = view_display_menu->get_popup()->get_item_index(VIEW_TRANSFORM_GIZMO);
@@ -5348,6 +5334,32 @@ void Node3DEditorViewport::_toggle_camera_preview(bool p_activate) {
 
 		surface->queue_redraw();
 	}
+
+	update_selection_outline_overlay();
+}
+
+void Node3DEditorViewport::update_selection_outline_overlay() {
+	if (!selection_outline_overlay || selection_outline_capture.is_null()) {
+		return;
+	}
+	bool active = spatial_editor->is_selection_outline_active() && !previewing && !previewing_cinema;
+	selection_outline_capture->set_gap_fill_radius(Math::round((float)EDITOR_GET("editors/3d/selection_outline_gap_fill") * EDSCALE));
+	if (active) {
+		Ref<World3D> world = viewport->find_world_3d();
+		selection_outline_capture->set_scene_compositor_effects(world.is_valid() ? world->get_compositor() : Ref<Compositor>());
+	}
+	selection_outline_capture->set_extract_enabled(active);
+	update_selection_outline_overlay_visibility();
+}
+
+void Node3DEditorViewport::update_selection_outline_overlay_visibility() {
+	if (!selection_outline_overlay || selection_outline_capture.is_null()) {
+		return;
+	}
+	bool show = spatial_editor->is_selection_outline_active() && !previewing && !previewing_cinema && selection_outline_capture->has_mask() && selection_outline_capture->is_capture_fresh();
+	if (selection_outline_overlay->is_visible() != show) {
+		selection_outline_overlay->set_visible(show);
+	}
 }
 
 void Node3DEditorViewport::_toggle_pilot_preview(bool p_activate) {
@@ -5495,6 +5507,8 @@ void Node3DEditorViewport::_toggle_cinema_preview(bool p_activate) {
 		view_display_menu->show();
 		surface->queue_redraw();
 	}
+
+	update_selection_outline_overlay();
 }
 
 void Node3DEditorViewport::_selection_result_pressed(int p_result) {
@@ -5838,6 +5852,7 @@ void Node3DEditorViewport::set_state(const Dictionary &p_state) {
 			preview_camera->set_pressed(true);
 			preview_camera->show();
 			pilot_camera->show();
+			update_selection_outline_overlay();
 
 			camera->set_global_transform(view_3d_controller->to_camera_transform());
 
@@ -7403,6 +7418,18 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	viewport = memnew(SubViewport);
 	viewport->set_disable_input(true);
 	c->add_child(viewport);
+
+	if (RD::get_singleton()) {
+		selection_outline_overlay = memnew(TextureRect);
+		selection_outline_overlay->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
+		selection_outline_overlay->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
+		selection_outline_overlay->set_stretch_mode(TextureRect::STRETCH_SCALE);
+		selection_outline_overlay->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+		selection_outline_overlay->set_material(p_spatial_editor->get_selection_outline_overlay_material());
+		selection_outline_overlay->set_visible(false);
+		add_child(selection_outline_overlay);
+	}
+
 	surface = memnew(Control);
 	SET_DRAG_FORWARDING_CD(surface, Node3DEditorViewport);
 	add_child(surface);
@@ -7424,6 +7451,13 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	viewport->add_child(camera);
 	camera->make_current();
 	surface->set_focus_mode(FOCUS_ALL);
+
+	if (RD::get_singleton()) {
+		selection_outline_capture.instantiate();
+		selection_outline_capture->setup(camera->get_camera());
+		selection_outline_capture->set_mask_changed_callback(callable_mp(this, &Node3DEditorViewport::update_selection_outline_overlay));
+		selection_outline_overlay->set_texture(selection_outline_capture->get_overlay_texture());
+	}
 
 	VBoxContainer *vbox = memnew(VBoxContainer);
 	surface->add_child(vbox);
@@ -8134,6 +8168,497 @@ void Node3DEditor::update_all_gizmos(Node *p_node) {
 		return;
 	}
 	_update_all_gizmos(p_node);
+}
+
+void Node3DEditor::_ensure_outline_materials() {
+	if (outline_mask_material[0].is_valid()) {
+		return;
+	}
+
+	// The mask passes stamp EditorSelectionOutlineCapture::StencilRef values into
+	// the stencil buffer without touching color; per-viewport capture passes then
+	// turn the stencil into a screen-space mask that the outline overlay
+	// edge-detects. Active masks render after selected masks so the active
+	// reference wins where they overlap.
+	const char *mask_template = R"(
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_test_disabled, depth_draw_never, shadows_disabled, fog_disabled;
+stencil_mode write, compare_always, %d;
+
+void fragment() {
+	ALPHA = 0.0;
+}
+)";
+
+	const bool screen_space = RD::get_singleton() != nullptr;
+	const int mask_refs[2] = { EditorSelectionOutlineCapture::STENCIL_REF_SELECTED, EditorSelectionOutlineCapture::STENCIL_REF_ACTIVE };
+
+	for (int i = 0; i < 2; i++) {
+		Ref<Shader> mask_shader;
+		mask_shader.instantiate();
+		mask_shader->set_code(vformat(mask_template, mask_refs[i]));
+
+		outline_mask_material[i].instantiate();
+		outline_mask_material[i]->set_shader(mask_shader);
+		outline_mask_material[i]->set_render_priority(Material::RENDER_PRIORITY_MAX - 3 + i);
+	}
+
+	if (screen_space) {
+		// Depth-tested re-stamp marking the unoccluded part of each silhouette,
+		// so the overlay can dim outline segments whose source is hidden. Both
+		// visible stamps render after both depth-ignoring ones: only the
+		// frontmost surface can pass the depth test, so the two visible stamps
+		// can't conflict with each other, and stamping them last keeps them
+		// from being overwritten by the other class's depth-ignoring stamp.
+		const char *visible_template = R"(
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, shadows_disabled, fog_disabled;
+stencil_mode write, compare_always, %d;
+
+void fragment() {
+	ALPHA = 0.0;
+}
+)";
+
+		const int visible_refs[2] = { EditorSelectionOutlineCapture::STENCIL_REF_SELECTED_VISIBLE, EditorSelectionOutlineCapture::STENCIL_REF_ACTIVE_VISIBLE };
+
+		for (int i = 0; i < 2; i++) {
+			Ref<Shader> visible_shader;
+			visible_shader.instantiate();
+			visible_shader->set_code(vformat(visible_template, visible_refs[i]));
+
+			outline_mask_visible_material[i].instantiate();
+			outline_mask_visible_material[i]->set_shader(visible_shader);
+			outline_mask_visible_material[i]->set_render_priority(Material::RENDER_PRIORITY_MAX - 1 + i);
+
+			outline_mask_material[i]->set_next_pass(outline_mask_visible_material[i]);
+		}
+	}
+
+	if (!screen_space) {
+		// The Compatibility renderer has no compositor hook for the screen-space
+		// pass, so draw the outline as an inflated hull tested against the mask.
+		const char *draw_template = R"(
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_test_disabled, depth_draw_never, shadows_disabled, fog_disabled;
+stencil_mode read, %s;
+
+uniform vec4 outline_color : source_color = vec4(1.0, 0.5, 0.0, 1.0);
+uniform float outline_width : hint_range(0.5, 10.0) = 1.0;
+
+void vertex() {
+	vec4 clip_position = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
+	vec3 clip_normal = mat3(PROJECTION_MATRIX) * (mat3(MODELVIEW_MATRIX) * NORMAL);
+	// Inflate by a constant amount in screen pixels, regardless of distance and projection.
+	clip_position.xy += normalize(clip_normal.xy + vec2(1e-6)) * outline_width * 2.0 * clip_position.w / VIEWPORT_SIZE;
+	POSITION = clip_position;
+}
+
+void fragment() {
+	ALBEDO = outline_color.rgb;
+	ALPHA = outline_color.a;
+}
+)";
+
+		// The selected outline only draws over the background, so outlines of multiple
+		// selected nodes merge into one silhouette. The active outline also draws over
+		// selected nodes to stay distinguishable when they overlap.
+		const String draw_stencil[2] = { "compare_equal, 0", vformat("compare_not_equal, %d", EditorSelectionOutlineCapture::STENCIL_REF_ACTIVE) };
+
+		for (int i = 0; i < 2; i++) {
+			Ref<Shader> draw_shader;
+			draw_shader.instantiate();
+			draw_shader->set_code(vformat(draw_template, draw_stencil[i]));
+
+			outline_draw_material[i].instantiate();
+			outline_draw_material[i]->set_shader(draw_shader);
+			outline_draw_material[i]->set_render_priority(Material::RENDER_PRIORITY_MAX - 1 + i);
+
+			outline_mask_material[i]->set_next_pass(outline_draw_material[i]);
+		}
+	}
+
+	_update_outline_material_parameters();
+}
+
+Ref<ShaderMaterial> Node3DEditor::get_selection_outline_overlay_material() {
+	if (outline_overlay_material.is_valid()) {
+		return outline_overlay_material;
+	}
+
+	Ref<Shader> edge_shader;
+	edge_shader.instantiate();
+	// Coverage-weighted outline over the selection mask captured from the
+	// stencil buffer (R = presence, G = active node, B = visible part). The
+	// capture feathers the mask, so deriving alpha from its coverage (instead
+	// of thresholding) yields antialiased outlines regardless of the MSAA
+	// setting.
+	edge_shader->set_code(R"(
+shader_type canvas_item;
+
+uniform vec4 outline_color : source_color = vec4(1.0, 0.5, 0.0, 1.0);
+uniform vec4 active_outline_color : source_color = vec4(1.5, 0.75, 0.0, 1.0);
+uniform float outline_width : hint_range(0.5, 10.0) = 1.0;
+
+const float OCCLUDED_OPACITY = 0.4;
+
+void fragment() {
+	// fwidth(UV) is one output pixel in UV space, which keeps the width in
+	// screen pixels even when the mask is at a scaled 3D render resolution.
+	vec2 pixel = outline_width * fwidth(UV);
+
+	vec3 center = texture(TEXTURE, UV).rgb;
+
+	// Two rings so larger widths don't undersample into scalloped bands.
+	vec2 offsets[16] = vec2[16](
+			vec2(-1.0, 0.0), vec2(1.0, 0.0), vec2(0.0, -1.0), vec2(0.0, 1.0),
+			vec2(-0.7071, -0.7071), vec2(0.7071, -0.7071), vec2(-0.7071, 0.7071), vec2(0.7071, 0.7071),
+			vec2(0.5543, 0.2296), vec2(0.2296, 0.5543), vec2(-0.2296, 0.5543), vec2(-0.5543, 0.2296),
+			vec2(-0.5543, -0.2296), vec2(-0.2296, -0.5543), vec2(0.2296, -0.5543), vec2(0.5543, -0.2296));
+
+	vec3 dilated = center;
+	for (int i = 0; i < 16; i++) {
+		dilated = max(dilated, texture(TEXTURE, UV + offsets[i] * pixel).rgb);
+	}
+
+	// Estimate the signed sub-pixel distance to the silhouette by renormalizing
+	// the feathered coverage with its screen-space gradient, then shade by
+	// distance: edges come out a crisp pixel wide and positioned between pixels
+	// instead of following the coverage ramp.
+	vec4 coverage = vec4(center.rg, dilated.rg);
+	vec4 grad = max(fwidth(coverage), vec4(0.0001));
+	vec4 edges = clamp((coverage - 0.5) / grad + 0.5, vec4(0.0), vec4(1.0));
+
+	// Band outside the union of all selected silhouettes, and a band around
+	// the active node that also draws over selected neighbors so the active
+	// outline stays distinguishable where they overlap.
+	float selected_band = edges.b * (1.0 - edges.r);
+	float active_band = edges.a * (1.0 - edges.g);
+
+	// Dim outline segments whose silhouette source is occluded.
+	float visible = clamp((dilated.b - 0.5) / max(fwidth(dilated.b), 0.0001) + 0.5, 0.0, 1.0);
+	float dim = mix(OCCLUDED_OPACITY, 1.0, visible);
+
+	float w_active = active_band * active_outline_color.a;
+	float w_selected = selected_band * (1.0 - active_band) * outline_color.a;
+	float alpha = (w_active + w_selected) * dim;
+	vec3 rgb = alpha > 0.0001 ? (active_outline_color.rgb * w_active + outline_color.rgb * w_selected) / (w_active + w_selected) : vec3(0.0);
+	COLOR = vec4(rgb, alpha);
+}
+)");
+
+	outline_overlay_material.instantiate();
+	outline_overlay_material->set_shader(edge_shader);
+	_update_outline_material_parameters();
+	return outline_overlay_material;
+}
+
+void Node3DEditor::_update_outline_material_parameters() {
+	const Color colors[2] = { EDITOR_GET("editors/3d/selection_box_color"), EDITOR_GET("editors/3d/active_selection_box_color") };
+	const float thickness = EDITOR_GET("editors/3d/selection_outline_thickness");
+
+	if (outline_overlay_material.is_valid()) {
+		outline_overlay_material->set_shader_parameter("outline_color", colors[0]);
+		outline_overlay_material->set_shader_parameter("active_outline_color", colors[1]);
+		outline_overlay_material->set_shader_parameter("outline_width", thickness * EDSCALE);
+	}
+
+	for (int i = 0; i < 2; i++) {
+		if (outline_draw_material[i].is_valid()) {
+			outline_draw_material[i]->set_shader_parameter("outline_color", colors[i]);
+			outline_draw_material[i]->set_shader_parameter("outline_width", thickness * EDSCALE);
+		}
+	}
+}
+
+void Node3DEditor::update_selection_outlines() {
+	if (outline_update_pending) {
+		return;
+	}
+	outline_update_pending = true;
+	callable_mp(this, &Node3DEditor::_deferred_update_outlines).call_deferred();
+}
+
+void Node3DEditor::_deferred_update_outlines() {
+	outline_update_pending = false;
+	_update_outlines();
+}
+
+void Node3DEditor::_update_outlines() {
+	const HashMap<ObjectID, Object *> &selection = editor_selection->get_selection();
+
+	if (selection.is_empty() || !outline_enabled) {
+		outline_active = false;
+		_clear_outlines();
+		for (uint32_t i = 0; i < VIEWPORTS_COUNT; i++) {
+			viewports[i]->update_selection_outline_overlay();
+		}
+		return;
+	}
+
+	outline_active = true;
+	for (uint32_t i = 0; i < VIEWPORTS_COUNT; i++) {
+		viewports[i]->update_selection_outline_overlay();
+	}
+
+	Node3D *active = active_node;
+	if (!active) {
+		active = ObjectDB::get_instance<Node3D>(selection.begin()->key);
+	}
+
+	HashSet<ObjectID> selected_nodes;
+	for (const KeyValue<ObjectID, Object *> &E : selection) {
+		Node3D *sp = ObjectDB::get_instance<Node3D>(E.key);
+		if (sp && sp->is_inside_tree()) {
+			selected_nodes.insert(sp->get_instance_id());
+		}
+	}
+
+	RenderingServer *rs = RenderingServer::get_singleton();
+	for (KeyValue<ObjectID, OutlineCacheEntry> &E : outline_cache) {
+		if (E.value.is_visible && !selected_nodes.has(E.key)) {
+			for (const RID &instance : E.value.instances) {
+				rs->instance_set_visible(instance, false);
+			}
+			E.value.is_visible = false;
+		}
+	}
+
+	for (const KeyValue<ObjectID, Object *> &E : selection) {
+		Node3D *sp = ObjectDB::get_instance<Node3D>(E.key);
+		if (!sp || !sp->is_inside_tree()) {
+			continue;
+		}
+		_create_outline_instances(sp, sp == active);
+
+		// The outline replaces the selection boxes while it is enabled, but
+		// nodes without outline geometry (lights, cameras, particles) keep
+		// their box so the selection stays visible.
+		Node3DEditorSelectedItem *se = editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(sp);
+		if (se) {
+			bool show_aabb = !_selected_node_has_outline(sp);
+			rs->instance_set_visible(se->sbox_instance, show_aabb);
+			rs->instance_set_visible(se->sbox_instance_offset, show_aabb);
+			rs->instance_set_visible(se->sbox_instance_xray, show_aabb);
+			rs->instance_set_visible(se->sbox_instance_xray_offset, show_aabb);
+		}
+	}
+}
+
+bool Node3DEditor::_selected_node_has_outline(Node3D *p_node) const {
+	const OutlineCacheEntry *entry = outline_cache.getptr(p_node->get_instance_id());
+	return entry && entry->is_visible && !entry->instances.is_empty();
+}
+
+void Node3DEditor::_create_outline_instances(Node3D *p_node, bool p_is_active) {
+	ERR_FAIL_NULL(p_node);
+
+	List<GeometryInstance3D *> geometry_instances;
+	_find_geometry_instances_recursive(p_node, geometry_instances);
+	if (geometry_instances.is_empty()) {
+		_clear_cached_outline_for_node(p_node);
+		return;
+	}
+
+	_ensure_outline_materials();
+	Ref<ShaderMaterial> mask_mat = outline_mask_material[p_is_active ? 1 : 0];
+
+	RenderingServer *rs = RenderingServer::get_singleton();
+	ObjectID node_id = p_node->get_instance_id();
+
+	if (outline_cache.has(node_id)) {
+		OutlineCacheEntry &entry = outline_cache[node_id];
+
+		bool geometry_valid = entry.base_rids.size() == geometry_instances.size();
+		if (geometry_valid) {
+			int i = 0;
+			for (GeometryInstance3D *geom_inst : geometry_instances) {
+				if (geom_inst->get_base() != entry.base_rids[i]) {
+					geometry_valid = false;
+					break;
+				}
+				i++;
+			}
+		}
+
+		if (geometry_valid) {
+			bool is_newly_outlined = !entry.is_visible;
+			bool active_status_changed = entry.is_active != p_is_active;
+
+			// Transforms are kept in step by sync_outline_transforms().
+			if (is_newly_outlined || active_status_changed) {
+				for (int i = 0; i < entry.instances.size(); i++) {
+					if (active_status_changed) {
+						rs->instance_geometry_set_material_override(entry.instances[i], mask_mat->get_rid());
+					}
+					if (is_newly_outlined) {
+						rs->instance_set_visible(entry.instances[i], true);
+					}
+				}
+			}
+
+			entry.is_active = p_is_active;
+			entry.is_visible = true;
+			return;
+		}
+
+		for (const RID &instance : entry.instances) {
+			if (instance.is_valid()) {
+				rs->free_rid(instance);
+			}
+		}
+		outline_cache.erase(node_id);
+	}
+
+	OutlineCacheEntry new_entry;
+
+	for (GeometryInstance3D *geom_inst : geometry_instances) {
+		RID base = geom_inst->get_base();
+		if (!base.is_valid()) {
+			continue;
+		}
+
+		RID instance = rs->instance_create2(base, geom_inst->get_world_3d()->get_scenario());
+		rs->instance_set_transform(instance, geom_inst->get_global_transform());
+		rs->instance_geometry_set_material_override(instance, mask_mat->get_rid());
+		// Same layer as the selection boxes, so View > Gizmos and non-editor cameras hide the outline.
+		rs->instance_set_layer_mask(instance, 1 << Node3DEditorViewport::GIZMO_EDIT_LAYER);
+		rs->instance_geometry_set_cast_shadows_setting(instance, RSE::SHADOW_CASTING_SETTING_OFF);
+		rs->instance_geometry_set_flag(instance, RSE::INSTANCE_FLAG_IGNORE_OCCLUSION_CULLING, true);
+		rs->instance_geometry_set_flag(instance, RSE::INSTANCE_FLAG_USE_BAKED_LIGHT, false);
+
+		MeshInstance3D *mesh_inst = Object::cast_to<MeshInstance3D>(geom_inst);
+		if (mesh_inst) {
+			Ref<SkinReference> skin_ref = mesh_inst->get_skin_reference();
+			if (skin_ref.is_valid()) {
+				rs->instance_attach_skeleton(instance, skin_ref->get_skeleton());
+			}
+		}
+
+		new_entry.instances.push_back(instance);
+		new_entry.base_rids.push_back(base);
+		new_entry.geometry_ids.push_back(geom_inst->get_instance_id());
+		new_entry.last_xforms.push_back(geom_inst->get_global_transform());
+	}
+
+	new_entry.is_active = p_is_active;
+	new_entry.is_visible = true;
+	outline_cache[node_id] = new_entry;
+}
+
+void Node3DEditor::sync_outline_transforms() {
+	if (!outline_active) {
+		return;
+	}
+	const uint64_t frame = Engine::get_singleton()->get_process_frames();
+	if (frame == outline_sync_frame) {
+		return;
+	}
+	outline_sync_frame = frame;
+
+	RenderingServer *rs = RenderingServer::get_singleton();
+	for (KeyValue<ObjectID, OutlineCacheEntry> &E : outline_cache) {
+		OutlineCacheEntry &entry = E.value;
+		if (!entry.is_visible || entry.geometry_ids.size() != entry.instances.size()) {
+			continue;
+		}
+		for (int i = 0; i < entry.geometry_ids.size(); i++) {
+			GeometryInstance3D *geom_inst = ObjectDB::get_instance<GeometryInstance3D>(entry.geometry_ids[i]);
+			if (!geom_inst || !geom_inst->is_inside_tree()) {
+				continue;
+			}
+			Transform3D t = geom_inst->get_global_transform();
+			if (t != entry.last_xforms[i]) {
+				entry.last_xforms.write[i] = t;
+				rs->instance_set_transform(entry.instances[i], t);
+			}
+		}
+	}
+}
+
+void Node3DEditor::_clear_outlines() {
+	RenderingServer *rs = RenderingServer::get_singleton();
+	for (KeyValue<ObjectID, OutlineCacheEntry> &E : outline_cache) {
+		if (!E.value.is_visible) {
+			continue;
+		}
+		for (const RID &instance : E.value.instances) {
+			rs->instance_set_visible(instance, false);
+		}
+		E.value.is_visible = false;
+	}
+}
+
+void Node3DEditor::_clear_cached_outline_for_node(Node3D *p_node) {
+	ERR_FAIL_NULL(p_node);
+	ObjectID node_id = p_node->get_instance_id();
+
+	if (outline_cache.has(node_id)) {
+		RenderingServer *rs = RenderingServer::get_singleton();
+		OutlineCacheEntry &entry = outline_cache[node_id];
+		for (const RID &instance : entry.instances) {
+			if (instance.is_valid()) {
+				rs->free_rid(instance);
+			}
+		}
+		outline_cache.erase(node_id);
+	}
+}
+
+void Node3DEditor::_find_geometry_instances_recursive(Node *p_node, List<GeometryInstance3D *> &r_list) {
+	ERR_FAIL_NULL(p_node);
+
+	if (Object::cast_to<GPUParticles3D>(p_node) || Object::cast_to<CPUParticles3D>(p_node)) {
+		return;
+	}
+
+	GeometryInstance3D *geom_instance = Object::cast_to<GeometryInstance3D>(p_node);
+	if (geom_instance && geom_instance->is_visible_in_tree() && geom_instance->get_base().is_valid()) {
+		r_list.push_back(geom_instance);
+	}
+
+	for (int i = 0; i < p_node->get_child_count(); i++) {
+		_find_geometry_instances_recursive(p_node->get_child(i), r_list);
+	}
+}
+
+void Node3DEditor::update_selected_item_aabb(Node3D *p_node) {
+	ERR_FAIL_NULL(p_node);
+
+	Node3DEditorSelectedItem *se = editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(p_node);
+	ERR_FAIL_NULL(se);
+	Transform3D t = p_node->get_global_gizmo_transform();
+	if (!t.is_finite()) {
+		return;
+	}
+	AABB new_aabb = Node3DEditorViewport::_calculate_spatial_bounds(p_node);
+	se->aabb = new_aabb;
+	Transform3D t_offset = t;
+	{
+		const Vector3 offset(0.005, 0.005, 0.005);
+		Basis aabb_s;
+		aabb_s.scale(se->aabb.size + offset);
+		t.translate_local(se->aabb.position - offset / 2);
+		t.basis = t.basis * aabb_s;
+	}
+	{
+		const Vector3 offset(0.01, 0.01, 0.01);
+		Basis aabb_s;
+		aabb_s.scale(se->aabb.size + offset);
+		t_offset.translate_local(se->aabb.position - offset / 2);
+		t_offset.basis = t_offset.basis * aabb_s;
+	}
+	bool show_aabb = !outline_enabled || !_selected_node_has_outline(p_node);
+	RenderingServer::get_singleton()->instance_set_visible(se->sbox_instance, show_aabb);
+	RenderingServer::get_singleton()->instance_set_visible(se->sbox_instance_offset, show_aabb);
+	RenderingServer::get_singleton()->instance_set_visible(se->sbox_instance_xray, show_aabb);
+	RenderingServer::get_singleton()->instance_set_visible(se->sbox_instance_xray_offset, show_aabb);
+	// Transforms are kept fresh even while hidden, so re-showing the boxes
+	// (e.g. when a node loses its outline geometry) can't use a stale pose.
+	RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance, t);
+	RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance_offset, t_offset);
+	RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance_xray, t);
+	RenderingServer::get_singleton()->instance_set_transform(se->sbox_instance_xray_offset, t_offset);
 }
 
 Object *Node3DEditor::_get_editor_data(Object *p_what) {
@@ -9922,6 +10447,10 @@ void Node3DEditor::_undo_redo_history_changed() {
 	for (Node *node : editor_selection->get_top_selected_node_list()) {
 		_refresh_collision_snap_bvh(node);
 	}
+
+	// Catches edits that don't move the selection but change what should be
+	// outlined, such as toggling a child's visibility or swapping a mesh.
+	update_selection_outlines();
 }
 
 void Node3DEditor::_selection_changed() {
@@ -9937,6 +10466,8 @@ void Node3DEditor::_selection_changed() {
 			active_node = last_selected;
 		}
 	}
+
+	update_selection_outlines();
 
 	for (const KeyValue<ObjectID, Object *> &E : selection) {
 		Node3D *sp = ObjectDB::get_instance<Node3D>(E.key);
@@ -9963,21 +10494,11 @@ void Node3DEditor::_selection_changed() {
 	}
 
 	if (selected && editor_selection->get_top_selected_node_list().size() != 1) {
-		Vector<Ref<Node3DGizmo>> gizmos = selected->get_gizmos();
-		for (int i = 0; i < gizmos.size(); i++) {
-			Ref<EditorNode3DGizmo> seg = gizmos[i];
-			if (seg.is_null()) {
-				continue;
-			}
-			seg->set_selected(false);
-		}
-
 		Node3DEditorSelectedItem *se = editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(selected);
 		if (se) {
 			se->gizmo.unref();
 			se->subgizmos.clear();
 		}
-		selected->update_gizmos();
 		selected = nullptr;
 	}
 
@@ -9994,6 +10515,24 @@ void Node3DEditor::_selection_changed() {
 	}
 
 	update_transform_gizmo();
+
+	HashSet<ObjectID> all_nodes_to_update(previous_selection);
+
+	for (const KeyValue<ObjectID, Object *> &E : selection) {
+		all_nodes_to_update.insert(E.key);
+	}
+
+	for (const ObjectID &id : all_nodes_to_update) {
+		Node3D *node = ObjectDB::get_instance<Node3D>(id);
+		if (node) {
+			_update_gizmo_selection_state(node);
+		}
+	}
+
+	previous_selection.clear();
+	for (const KeyValue<ObjectID, Object *> &E : selection) {
+		previous_selection.insert(E.key);
+	}
 }
 
 void Node3DEditor::refresh_dirty_gizmos() {
@@ -10481,6 +11020,17 @@ void Node3DEditor::_notification(int p_what) {
 					active_selection_box_mat->set_albedo(active_selection_box_color);
 					active_selection_box_mat_xray->set_albedo(active_selection_box_color * Color(1, 1, 1, 0.15));
 				}
+				outline_enabled = EDITOR_GET("editors/3d/selection_outline_enabled");
+				_update_outline_material_parameters();
+				update_selection_outlines();
+				for (const KeyValue<ObjectID, Object *> &E : editor_selection->get_selection()) {
+					Node3D *sp = ObjectDB::get_instance<Node3D>(E.key);
+					if (!sp) {
+						continue;
+					}
+					update_selected_item_aabb(sp);
+				}
+				update_transform_gizmo();
 
 				gizmo_view_rotation_scale = GIZMO_CIRCLE_SIZE * (float)EDITOR_GET("editors/3d/view_plane_rotation_gizmo_scale");
 
@@ -10686,13 +11236,38 @@ void Node3DEditor::move_control_to_right_panel(Control *p_control) {
 	add_control_to_right_panel(p_control);
 }
 
+void Node3DEditor::_update_gizmo_selection_state(Node3D *p_node) {
+	ERR_FAIL_NULL(p_node);
+
+	bool is_selected = editor_selection->is_selected(p_node);
+	bool is_single_selection = editor_selection->get_top_selected_node_list().size() == 1;
+	bool should_be_selected = is_selected && is_single_selection;
+	bool should_be_highlighted = is_selected && !is_single_selection;
+
+	Vector<Ref<Node3DGizmo>> gizmos = p_node->get_gizmos();
+	for (int i = 0; i < gizmos.size(); i++) {
+		Ref<EditorNode3DGizmo> seg = gizmos[i];
+		if (seg.is_null()) {
+			continue;
+		}
+		seg->set_selected(should_be_selected);
+		seg->set_highlighted(should_be_highlighted);
+	}
+	if (!gizmos.is_empty()) {
+		p_node->update_gizmos();
+	}
+}
+
 void Node3DEditor::_request_gizmo(Object *p_obj) {
 	Node3D *sp = Object::cast_to<Node3D>(p_obj);
 	if (!sp) {
 		return;
 	}
 
-	bool is_selected = (sp == selected);
+	bool is_selected = editor_selection->is_selected(sp);
+	bool is_single_selection = editor_selection->get_top_selected_node_list().size() == 1;
+
+	sp->clear_gizmos();
 
 	Node *edited_scene = EditorNode::get_singleton()->get_edited_scene();
 	if (edited_scene && (sp == edited_scene || (sp->get_owner() && edited_scene->is_ancestor_of(sp)))) {
@@ -10702,9 +11277,11 @@ void Node3DEditor::_request_gizmo(Object *p_obj) {
 			if (seg.is_valid()) {
 				sp->add_gizmo(seg);
 
-				if (is_selected != seg->is_selected()) {
-					seg->set_selected(is_selected);
-				}
+				bool should_be_selected = is_selected && is_single_selection;
+				bool should_be_highlighted = is_selected && !is_single_selection;
+
+				seg->set_selected(should_be_selected);
+				seg->set_highlighted(should_be_highlighted);
 			}
 		}
 		if (!sp->get_gizmos().is_empty()) {
@@ -10854,6 +11431,11 @@ void Node3DEditor::_node_removed(Node *p_node) {
 				_update_preview_environment();
 			}
 		}
+	}
+
+	Node3D *sp = Object::cast_to<Node3D>(p_node);
+	if (sp) {
+		_clear_cached_outline_for_node(sp);
 	}
 
 	if (p_node == selected) {
@@ -11604,6 +12186,8 @@ Node3DEditor::Node3DEditor() {
 		viewport_base->add_viewport(viewports[i], i);
 	}
 
+	outline_enabled = EDITOR_GET("editors/3d/selection_outline_enabled");
+
 	/* SNAP DIALOG */
 
 	snap_dialog = memnew(ConfirmationDialog);
@@ -11949,6 +12533,13 @@ void fragment() {
 }
 Node3DEditor::~Node3DEditor() {
 	singleton = nullptr;
+	for (const KeyValue<ObjectID, OutlineCacheEntry> &E : outline_cache) {
+		for (const RID &instance : E.value.instances) {
+			if (instance.is_valid()) {
+				RenderingServer::get_singleton()->free_rid(instance);
+			}
+		}
+	}
 	memdelete(preview_node);
 	if (preview_sun_dangling && preview_sun) {
 		memdelete(preview_sun);
