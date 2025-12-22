@@ -567,37 +567,134 @@ void ProjectDialog::ok_pressed() {
 			}
 		}
 
-		String defaultPath = OS::get_singleton()->get_executable_path().get_base_dir() + "/default_project";
+		String default_zip_path = OS::get_singleton()->get_executable_path().get_base_dir() + "/default_project.zip";
 
 		Ref<DirAccess> d = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
-		if (!d->dir_exists(defaultPath)) {
+		if (!d->file_exists(default_zip_path)) {
 			// Remove existing dialog and create a new one each time
 			if (dialog_error != nullptr) {
 				memdelete(dialog_error);
 			}
-			
+
 			dialog_error = memnew(AcceptDialog);
 			dialog_error->set_title(TTRC("Error"));
 			add_child(dialog_error);
-			
+
 			// Show message without the URL to avoid duplication
-			dialog_error->set_text(TTRC("Default project template not found."));
-			
+			dialog_error->set_text(TTRC("Default project template (default_project.zip) not found."));
+
 			// Add a button to open the URL
 			String url = "https://github.com/Open-Industry-Project/Open-Industry-Project/releases";
 			dialog_error->add_button(TTRC("Open Download Page"), true, "open_url");
-			
+
 			// Store the URL as metadata
 			dialog_error->set_meta("download_url", url);
-			
+
 			// Connect the signal for this instance
 			dialog_error->connect("custom_action", callable_mp(this, &ProjectDialog::_on_dialog_custom_action));
-			
+
 			dialog_error->popup_centered();
 			return;
 		}
 
-		std::filesystem::copy(defaultPath.utf8().get_data(), path.utf8().get_data(), std::filesystem::copy_options::recursive);
+		// Extract default_project.zip to project path
+		Ref<FileAccess> io_fa;
+		zlib_filefunc_def io = zipio_create_io(&io_fa);
+
+		unzFile pkg = unzOpen2(default_zip_path.utf8().get_data(), &io);
+		if (!pkg) {
+			_set_message(TTRC("Error opening default project template, not in ZIP format."), MESSAGE_ERROR);
+			return;
+		}
+
+		// Find the first directory with a "project.godot" to determine zip_root.
+		String zip_root;
+		int ret = unzGoToFirstFile(pkg);
+		while (ret == UNZ_OK) {
+			unz_file_info info;
+			char fname[16384];
+			unzGetCurrentFileInfo(pkg, &info, fname, 16384, nullptr, 0, nullptr, 0);
+
+			String name = String::utf8(fname);
+
+			// Skip the __MACOSX directory created by macOS's built-in file zipper.
+			if (name.begins_with("__MACOSX")) {
+				ret = unzGoToNextFile(pkg);
+				continue;
+			}
+
+			if (name.get_file() == "project.godot") {
+				zip_root = name.get_base_dir();
+				break;
+			}
+
+			ret = unzGoToNextFile(pkg);
+		}
+
+		// Extract all files
+		ret = unzGoToFirstFile(pkg);
+
+		Vector<String> failed_files;
+		while (ret == UNZ_OK) {
+			unz_file_info info;
+			char fname[16384];
+			ret = unzGetCurrentFileInfo(pkg, &info, fname, 16384, nullptr, 0, nullptr, 0);
+			ERR_FAIL_COND_MSG(ret != UNZ_OK, "Failed to get current file info.");
+
+			String name = String::utf8(fname);
+
+			// Skip the __MACOSX directory created by macOS's built-in file zipper.
+			if (name.begins_with("__MACOSX")) {
+				ret = unzGoToNextFile(pkg);
+				continue;
+			}
+
+			String rel_path = name.trim_prefix(zip_root);
+			if (rel_path.is_empty()) { // Root.
+			} else if (rel_path.ends_with("/")) { // Directory.
+				Ref<DirAccess> da = DirAccess::create(DirAccess::ACCESS_FILESYSTEM);
+				da->make_dir(path.path_join(rel_path));
+			} else { // File.
+				Vector<uint8_t> uncomp_data;
+				uncomp_data.resize(info.uncompressed_size);
+
+				unzOpenCurrentFile(pkg);
+				ret = unzReadCurrentFile(pkg, uncomp_data.ptrw(), uncomp_data.size());
+				ERR_BREAK_MSG(ret < 0, vformat("An error occurred while attempting to read from file: %s. This file will not be used.", rel_path));
+				unzCloseCurrentFile(pkg);
+
+				Ref<FileAccess> f = FileAccess::open(path.path_join(rel_path), FileAccess::WRITE);
+				if (f.is_valid()) {
+					f->store_buffer(uncomp_data.ptr(), uncomp_data.size());
+				} else {
+					failed_files.push_back(rel_path);
+				}
+			}
+
+			ret = unzGoToNextFile(pkg);
+		}
+
+		unzClose(pkg);
+
+		if (failed_files.size()) {
+			String err_msg = TTR("The following files failed extraction from default project template:") + "\n\n";
+			for (int i = 0; i < failed_files.size(); i++) {
+				if (i > 15) {
+					err_msg += "\nAnd " + itos(failed_files.size() - i) + " more files.";
+					break;
+				}
+				err_msg += failed_files[i] + "\n";
+			}
+
+			if (dialog_error == nullptr) {
+				dialog_error = memnew(AcceptDialog);
+				dialog_error->set_title(TTRC("Error"));
+				add_child(dialog_error);
+			}
+			dialog_error->set_text(err_msg);
+			dialog_error->popup_centered();
+			return;
+		}
 	}
 
 	// Two cases for importing a ZIP.
@@ -981,7 +1078,7 @@ void ProjectDialog::_bind_methods() {
 	ADD_SIGNAL(MethodInfo("project_created"));
 	ADD_SIGNAL(MethodInfo("project_duplicated"));
 	ADD_SIGNAL(MethodInfo("projects_updated"));
-	
+
 	ClassDB::bind_method(D_METHOD("_on_dialog_custom_action", "action"), &ProjectDialog::_on_dialog_custom_action);
 }
 
