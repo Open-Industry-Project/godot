@@ -7129,9 +7129,24 @@ void Node3DEditorViewport::_update_outline_material(Ref<ShaderMaterial> p_materi
 void Node3DEditorViewport::_create_selection_buffer_instances(Node3D *p_node, bool p_is_active, RID p_scenario) {
 	ERR_FAIL_NULL(p_node);
 
+	// Check if this is a CSG child shape first (before finding geometry instances).
+	// CSG children don't have their own mesh base - their geometry is combined into the root's mesh.
+	bool is_csg_child = false;
+	if (p_node->is_class("CSGShape3D")) {
+		bool is_root = p_node->call("is_root_shape");
+		if (!is_root) {
+			is_csg_child = true;
+		}
+	}
+
 	List<GeometryInstance3D *> geometry_instances;
-	_find_geometry_instances_recursive(p_node, geometry_instances);
-	if (geometry_instances.is_empty()) {
+	if (!is_csg_child) {
+		// Only search for geometry instances if this is not a CSG child.
+		// For CSG children, we handle them specially.
+		_find_geometry_instances_recursive(p_node, geometry_instances);
+	}
+
+	if (geometry_instances.is_empty() && !is_csg_child) {
 		return;
 	}
 
@@ -7151,23 +7166,32 @@ void Node3DEditorViewport::_create_selection_buffer_instances(Node3D *p_node, bo
 	if (cached_outline_instances.has(node_id)) {
 		Vector<RID> &cached_instances = cached_outline_instances[node_id];
 
-		bool geometry_valid = (cached_instances.size() == geometry_instances.size());
-		if (geometry_valid && cached_base_rids.has(node_id)) {
-			Vector<RID> &cached_bases = cached_base_rids[node_id];
-			if (cached_bases.size() == geometry_instances.size()) {
-				int i = 0;
-				for (GeometryInstance3D *geom_inst : geometry_instances) {
-					RID current_base = geom_inst->get_base();
-					RID cached_base = cached_bases[i];
+		// Check if cached geometry is still valid.
+		bool geometry_valid = false;
 
-					if (current_base != cached_base) {
-						geometry_valid = false;
-						break;
+		if (is_csg_child) {
+			// For CSG children, always regenerate the mesh since CSG properties can change.
+			// We can't easily detect when a CSG shape is modified, so always rebuild.
+			geometry_valid = false;
+		} else {
+			geometry_valid = (cached_instances.size() == geometry_instances.size());
+			if (geometry_valid && cached_base_rids.has(node_id)) {
+				Vector<RID> &cached_bases = cached_base_rids[node_id];
+				if (cached_bases.size() == geometry_instances.size()) {
+					int i = 0;
+					for (GeometryInstance3D *geom_inst : geometry_instances) {
+						RID current_base = geom_inst->get_base();
+						RID cached_base = cached_bases[i];
+
+						if (current_base != cached_base) {
+							geometry_valid = false;
+							break;
+						}
+						i++;
 					}
-					i++;
+				} else {
+					geometry_valid = false;
 				}
-			} else {
-				geometry_valid = false;
 			}
 		}
 
@@ -7218,6 +7242,10 @@ void Node3DEditorViewport::_create_selection_buffer_instances(Node3D *p_node, bo
 		if (cached_outline_has_skeleton.has(node_id)) {
 			cached_outline_has_skeleton.erase(node_id);
 		}
+
+		if (cached_csg_outline_meshes.has(node_id)) {
+			cached_csg_outline_meshes.erase(node_id);
+		}
 	}
 
 	RenderingServer *rs = RenderingServer::get_singleton();
@@ -7250,6 +7278,26 @@ void Node3DEditorViewport::_create_selection_buffer_instances(Node3D *p_node, bo
 		selection_id_instances[node_id].push_back(instance);
 		new_instances.push_back(instance);
 		new_base_rids.push_back(base);
+	}
+
+	// Handle CSG child shapes by getting the brush mesh directly.
+	if (is_csg_child && new_instances.is_empty()) {
+		Ref<ArrayMesh> csg_mesh = p_node->call("get_brush_mesh");
+		if (csg_mesh.is_valid() && csg_mesh->get_surface_count() > 0) {
+			cached_csg_outline_meshes[node_id] = csg_mesh;
+
+			RID base = csg_mesh->get_rid();
+			RID instance = rs->instance_create2(base, p_scenario);
+			rs->instance_set_transform(instance, p_node->get_global_transform());
+			rs->instance_geometry_set_material_override(instance, id_mat->get_rid());
+			rs->instance_set_layer_mask(instance, 1 << SELECTION_OUTLINE_LAYER);
+			rs->instance_geometry_set_cast_shadows_setting(instance, RS::SHADOW_CASTING_SETTING_OFF);
+			rs->instance_set_visible(instance, true);
+
+			selection_id_instances[node_id].push_back(instance);
+			new_instances.push_back(instance);
+			new_base_rids.push_back(base);
+		}
 	}
 
 	cached_outline_instances[node_id] = new_instances;
@@ -7336,7 +7384,7 @@ void Node3DEditorViewport::_update_outline() {
 	current_outlined_nodes = selected_nodes;
 
 	// Use continuous viewport update for skeletal meshes so outlines follow bone animation.
-	selection_has_skeleton = false;
+	bool selection_has_skeleton = false;
 	for (const ObjectID &node_id : selected_nodes) {
 		if (cached_outline_has_skeleton.has(node_id) && cached_outline_has_skeleton[node_id]) {
 			selection_has_skeleton = true;
@@ -7468,6 +7516,10 @@ void Node3DEditorViewport::_clear_cached_outline_for_node(Node3D *p_node) {
 
 	if (cached_outline_has_skeleton.has(node_id)) {
 		cached_outline_has_skeleton.erase(node_id);
+	}
+
+	if (cached_csg_outline_meshes.has(node_id)) {
+		cached_csg_outline_meshes.erase(node_id);
 	}
 }
 

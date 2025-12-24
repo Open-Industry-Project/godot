@@ -135,6 +135,7 @@ public:
 	Operation get_operation() const;
 
 	virtual Vector<Vector3> get_brush_faces();
+	Ref<ArrayMesh> get_brush_mesh();
 
 	virtual AABB get_aabb() const override;
 

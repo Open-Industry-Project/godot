@@ -848,6 +848,46 @@ Vector<Vector3> CSGShape3D::get_brush_faces() {
 	return faces;
 }
 
+Ref<ArrayMesh> CSGShape3D::get_brush_mesh() {
+	ERR_FAIL_COND_V(!is_inside_tree(), Ref<ArrayMesh>());
+
+	// Build the brush directly, bypassing the manifold processing in _get_brush().
+	// The manifold library can simplify geometry, but we want the raw shape.
+	CSGBrush *b = _build_brush();
+	if (!b) {
+		return Ref<ArrayMesh>();
+	}
+
+	if (b->faces.is_empty()) {
+		memdelete(b);
+		return Ref<ArrayMesh>();
+	}
+
+	// Extract faces from the brush.
+	Vector<Vector3> faces;
+	int fc = b->faces.size();
+	faces.resize(fc * 3);
+	{
+		Vector3 *w = faces.ptrw();
+		for (int i = 0; i < fc; i++) {
+			w[i * 3 + 0] = b->faces[i].vertices[0];
+			w[i * 3 + 1] = b->faces[i].vertices[1];
+			w[i * 3 + 2] = b->faces[i].vertices[2];
+		}
+	}
+
+	memdelete(b);
+
+	// Create mesh exactly like the CSG gizmo does.
+	Ref<ArrayMesh> mesh = memnew(ArrayMesh);
+	Array array;
+	array.resize(Mesh::ARRAY_MAX);
+	array[Mesh::ARRAY_VERTEX] = faces;
+	mesh->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, array);
+
+	return mesh;
+}
+
 void CSGShape3D::_notification(int p_what) {
 	switch (p_what) {
 		case NOTIFICATION_PARENTED: {
@@ -996,6 +1036,7 @@ Ref<TriangleMesh> CSGShape3D::generate_triangle_mesh() const {
 
 void CSGShape3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_root_shape"), &CSGShape3D::is_root_shape);
+	ClassDB::bind_method(D_METHOD("get_brush_mesh"), &CSGShape3D::get_brush_mesh);
 
 	ClassDB::bind_method(D_METHOD("set_operation", "operation"), &CSGShape3D::set_operation);
 	ClassDB::bind_method(D_METHOD("get_operation"), &CSGShape3D::get_operation);

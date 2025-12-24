@@ -379,6 +379,11 @@ void CSGShape3DGizmoPlugin::redraw(EditorNode3DGizmo *p_gizmo) {
 
 	CSGShape3D *cs = Object::cast_to<CSGShape3D>(p_gizmo->get_node_3d());
 
+	// Update selection outline when CSG shape changes.
+	if (!cs->is_root_shape()) {
+		Node3DEditor::get_singleton()->update_outlines_all_viewports();
+	}
+
 	Vector<Vector3> faces = cs->get_brush_faces();
 
 	if (faces.is_empty()) {

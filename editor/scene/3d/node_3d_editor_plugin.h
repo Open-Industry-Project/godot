@@ -272,9 +272,9 @@ private:
 	HashMap<ObjectID, Vector<RID>> cached_base_rids;
 	HashMap<ObjectID, bool> cached_outline_is_active;
 	HashMap<ObjectID, bool> cached_outline_has_skeleton;
+	HashMap<ObjectID, Ref<ArrayMesh>> cached_csg_outline_meshes;
 	HashSet<ObjectID> current_outlined_nodes;
 	bool outline_update_pending = false;
-	bool selection_has_skeleton = false;
 
 	bool transforming = false;
 	bool orthogonal;
