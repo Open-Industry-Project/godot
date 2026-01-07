@@ -30,10 +30,12 @@
 
 #include "editor_properties_vector.h"
 
+#include "editor/editor_interface.h"
 #include "editor/editor_string_names.h"
 #include "editor/gui/editor_spin_slider.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
+#include "scene/3d/node_3d.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/texture_button.h"
 
@@ -124,6 +126,18 @@ void EditorPropertyVectorN::_grab_changed(bool p_grab) {
 		_update_ratio();
 	}
 	is_grabbed = p_grab;
+
+	Object *edited = get_edited_object();
+	if (edited && Object::cast_to<Node3D>(edited)) {
+		const StringName &prop = get_edited_property();
+		if (prop == SNAME("position") || prop == SNAME("rotation") || prop == SNAME("rotation_degrees") || prop == SNAME("scale")) {
+			if (p_grab) {
+				EditorInterface::get_singleton()->transform_editing_started();
+			} else {
+				EditorInterface::get_singleton()->transform_editing_ended();
+			}
+		}
+	}
 }
 
 void EditorPropertyVectorN::_notification(int p_what) {

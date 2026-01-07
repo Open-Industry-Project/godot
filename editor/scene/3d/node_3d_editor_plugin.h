@@ -56,6 +56,7 @@ class Node3DEditorViewport;
 class OptionButton;
 class PanelContainer;
 class ProceduralSkyMaterial;
+class RigidBody3D;
 class SubViewport;
 class SubViewportContainer;
 class VSeparator;
@@ -234,7 +235,6 @@ private:
 	Label *ruler_label_y = nullptr;
 	Label *ruler_label_z = nullptr;
 
-	bool freeze = false;
 
 	int index;
 	ViewType view_type;
@@ -897,6 +897,8 @@ private:
 
 	bool gizmos_dirty = false;
 
+	HashSet<ObjectID> frozen_bodies;
+
 	static Node3DEditor *singleton;
 
 	void _node_added(Node *p_node);
@@ -1113,6 +1115,10 @@ public:
 
 	void edit(Node3D *p_spatial);
 	void clear();
+
+	void freeze_physics_for_transform();
+	void unfreeze_physics_for_transform();
+	void keep_body_frozen_after_transform(RigidBody3D *p_body);
 
 	Node3DEditor();
 	~Node3DEditor();

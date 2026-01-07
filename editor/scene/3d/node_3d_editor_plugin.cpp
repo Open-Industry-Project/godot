@@ -741,6 +741,7 @@ void Node3DEditorViewport::cancel_transform() {
 	collision_reposition_warning_shown = false;
 	collision_reposition_normal_applied = false;
 	collision_reposition_alignment_axis = 1;
+	spatial_editor->unfreeze_physics_for_transform();
 	finish_transform();
 	set_message(TTRC("Transform Aborted."), 3);
 }
@@ -1412,6 +1413,7 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 
 			} else {
 				//handle plane translate
+				spatial_editor->freeze_physics_for_transform();
 				_edit.mode = TRANSFORM_TRANSLATE;
 				_compute_edit(p_screenpos);
 				_edit.plane = TransformPlane(TRANSFORM_X_AXIS + col_axis + (is_plane_translate ? 3 : 0));
@@ -1484,6 +1486,7 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 			if (p_highlight_only) {
 				spatial_editor->select_gizmo_highlight_axis(GIZMO_HIGHLIGHT_AXIS_VIEW_ROTATION);
 			} else {
+				spatial_editor->freeze_physics_for_transform();
 				_edit.mode = TRANSFORM_ROTATE;
 				_compute_edit(p_screenpos);
 				_edit.plane = TRANSFORM_VIEW;
@@ -1497,6 +1500,7 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 			if (p_highlight_only) {
 				spatial_editor->select_gizmo_highlight_axis(GIZMO_HIGHLIGHT_AXIS_TRACKBALL);
 			} else {
+				spatial_editor->freeze_physics_for_transform();
 				_edit.mode = TRANSFORM_ROTATE;
 				_compute_edit(p_screenpos);
 				_edit.plane = TRANSFORM_VIEW;
@@ -1513,6 +1517,7 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 				spatial_editor->select_gizmo_highlight_axis(col_axis + 3);
 			} else {
 				//handle axis-specific rotate
+				spatial_editor->freeze_physics_for_transform();
 				_edit.mode = TRANSFORM_ROTATE;
 				_compute_edit(p_screenpos);
 				_edit.plane = TransformPlane(TRANSFORM_X_AXIS + col_axis);
@@ -1582,6 +1587,7 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 
 			} else {
 				//handle scale
+				spatial_editor->freeze_physics_for_transform();
 				_edit.mode = TRANSFORM_SCALE;
 				_compute_edit(p_screenpos);
 				_edit.plane = TransformPlane(TRANSFORM_X_AXIS + col_axis + (is_plane_scale ? 3 : 0));
@@ -2322,9 +2328,12 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 							}
 
 							se->gizmo->commit_subgizmos(ids, restore, false);
+							spatial_editor->unfreeze_physics_for_transform();
 						} else {
 							if (_edit.original_mouse_pos != _edit.mouse_pos) {
 								commit_transform();
+							} else {
+								spatial_editor->unfreeze_physics_for_transform();
 							}
 						}
 						_edit.mode = TRANSFORM_NONE;
@@ -2436,6 +2445,7 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 					bool is_clicked_selected = editor_selection->is_selected(ObjectDB::get_instance<Node>(clicked));
 
 					if (_edit.mode == TRANSFORM_NONE && (is_select_mode || is_clicked_selected)) {
+						spatial_editor->freeze_physics_for_transform();
 						_compute_edit(_edit.original_mouse_pos);
 						clicked = ObjectID();
 						_edit.mode = TRANSFORM_TRANSLATE;
@@ -2850,23 +2860,7 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 					}
 					_edit.mode = TRANSFORM_TRANSLATE;
 					collision_reposition = true;
-
-					if (!freeze) {
-						const List<Node *> &selection = editor_selection->get_top_selected_node_list();
-						for (Node *E : selection) {
-							Array children = E->get_children();
-
-							for (int i = 0; i < children.size(); i++) {
-								RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
-								if (rb) {
-									if (rb->is_freeze_enabled() == false) {
-										rb->set_freeze_enabled(true);
-										freeze = true;
-									}
-								}
-							}
-						}
-					}
+					spatial_editor->freeze_physics_for_transform();
 				}
 			}
 		}
@@ -6268,6 +6262,7 @@ void Node3DEditorViewport::drop_data_fw(const Point2 &p_point, const Variant &p_
 
 void Node3DEditorViewport::begin_transform(TransformMode p_mode, bool instant) {
 	if (get_selected_count() > 0) {
+		spatial_editor->freeze_physics_for_transform();
 		_edit.mode = p_mode;
 		_compute_edit(_edit.mouse_pos);
 		_edit.instant = instant;
@@ -6318,23 +6313,9 @@ void Node3DEditorViewport::commit_transform() {
 	collision_reposition_warning_shown = false;
 	collision_reposition_normal_applied = false;
 	collision_reposition_alignment_axis = 1;
+	spatial_editor->unfreeze_physics_for_transform();
 	finish_transform();
 	set_message("");
-
-	if (freeze) {
-		freeze = false;
-		const List<Node *> &selection = editor_selection->get_top_selected_node_list();
-		for (Node *E : selection) {
-			Array children = E->get_children();
-
-			for (int i = 0; i < children.size(); i++) {
-				RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
-				if (rb) {
-					rb->set_freeze_enabled(false);
-				}
-			}
-		}
-	}
 }
 
 void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
@@ -6416,23 +6397,6 @@ void Node3DEditorViewport::update_transform(bool p_shift) {
 	// View-plane translate/scale always uses global coords; rotation and axis operations respect local/global preference.
 	bool local_coords = spatial_editor->are_local_coords_enabled() &&
 			!(_edit.plane == TRANSFORM_VIEW && _edit.mode != TRANSFORM_ROTATE);
-
-	if (!freeze) {
-		const List<Node *> &selection = editor_selection->get_top_selected_node_list();
-		for (Node *E : selection) {
-			Array children = E->get_children();
-
-			for (int i = 0; i < children.size(); i++) {
-				RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
-				if (rb) {
-					if (rb->is_freeze_enabled() == false) {
-						rb->set_freeze_enabled(true);
-						freeze = true;
-					}
-				}
-			}
-		}
-	}
 
 	switch (_edit.mode) {
 		case TRANSFORM_SCALE: {
@@ -8060,6 +8024,43 @@ void Node3DEditor::set_state(const Dictionary &p_state) {
 		environ_button->set_pressed(true);
 		_preview_settings_changed();
 		_update_preview_environment();
+	}
+}
+
+void Node3DEditor::freeze_physics_for_transform() {
+	if (!frozen_bodies.is_empty()) {
+		return; // Already frozen.
+	}
+
+	const List<Node *> &selection = editor_selection->get_top_selected_node_list();
+	for (Node *E : selection) {
+		Array children = E->get_children();
+		for (int i = 0; i < children.size(); i++) {
+			RigidBody3D *rb = Object::cast_to<RigidBody3D>(children[i]);
+			if (rb && !rb->is_freeze_enabled()) {
+				rb->set_freeze_enabled(true);
+				frozen_bodies.insert(rb->get_instance_id()); // Only track ones we froze.
+			}
+		}
+	}
+}
+
+void Node3DEditor::unfreeze_physics_for_transform() {
+	for (const ObjectID &id : frozen_bodies) {
+		Object *obj = ObjectDB::get_instance(id);
+		RigidBody3D *rb = Object::cast_to<RigidBody3D>(obj);
+		if (rb) {
+			rb->set_freeze_enabled(false);
+		}
+	}
+	frozen_bodies.clear();
+}
+
+void Node3DEditor::keep_body_frozen_after_transform(RigidBody3D *p_body) {
+	// Remove body from frozen_bodies so it won't be unfrozen when transform ends.
+	// Call this from custom freeze shortcuts to keep a body frozen after transform.
+	if (p_body) {
+		frozen_bodies.erase(p_body->get_instance_id());
 	}
 }
 
@@ -9838,6 +9839,9 @@ void Node3DEditor::_notification(int p_what) {
 			SceneTreeDock::get_singleton()->get_tree_editor()->connect("node_changed", callable_mp(this, &Node3DEditor::_refresh_menu_icons));
 			editor_selection->connect("selection_changed", callable_mp(this, &Node3DEditor::_selection_changed));
 
+			EditorInterface::get_singleton()->connect("transform_editing_started", callable_mp(this, &Node3DEditor::freeze_physics_for_transform));
+			EditorInterface::get_singleton()->connect("transform_editing_ended", callable_mp(this, &Node3DEditor::unfreeze_physics_for_transform));
+
 			_update_preview_environment();
 
 			sun_state->set_custom_minimum_size(sun_vb->get_combined_minimum_size());
@@ -10276,6 +10280,7 @@ void Node3DEditor::_bind_methods() {
 
 	ClassDB::bind_method("update_all_gizmos", &Node3DEditor::update_all_gizmos);
 	ClassDB::bind_method("update_transform_gizmo", &Node3DEditor::update_transform_gizmo);
+	ClassDB::bind_method(D_METHOD("keep_body_frozen_after_transform", "body"), &Node3DEditor::keep_body_frozen_after_transform);
 
 	ADD_SIGNAL(MethodInfo("transform_key_request"));
 	ADD_SIGNAL(MethodInfo("item_lock_status_changed"));

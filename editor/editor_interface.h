@@ -51,6 +51,7 @@ class FileSystemDock;
 class Mesh;
 class Node;
 class PropertySelector;
+class RigidBody3D;
 class SceneTreeDialog;
 class ScriptEditor;
 class SubViewport;
@@ -129,6 +130,9 @@ public:
 
 	void get_transform_gizmo_data(Dictionary data);
 	void get_transform_commited();
+	void transform_editing_started();
+	void transform_editing_ended();
+	void keep_body_frozen_after_transform(RigidBody3D *p_body);
 	void set_simulation_started(bool p_started);
 
 	void set_main_screen_editor(const String &p_name);

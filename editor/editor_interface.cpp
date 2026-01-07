@@ -56,6 +56,7 @@
 #include "main/main.h"
 #include "scene/3d/light_3d.h"
 #include "scene/3d/mesh_instance_3d.h"
+#include "scene/3d/physics/rigid_body_3d.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/control.h"
 #include "scene/main/window.h"
@@ -434,6 +435,18 @@ void EditorInterface::get_transform_gizmo_data(Dictionary data) {
 
 void EditorInterface::get_transform_commited(){
 	emit_signal("transform_commited");
+}
+
+void EditorInterface::transform_editing_started() {
+	emit_signal("transform_editing_started");
+}
+
+void EditorInterface::transform_editing_ended() {
+	emit_signal("transform_editing_ended");
+}
+
+void EditorInterface::keep_body_frozen_after_transform(RigidBody3D *p_body) {
+	Node3DEditor::get_singleton()->keep_body_frozen_after_transform(p_body);
 }
 
 Node3D *EditorInterface::get_active_node_3d() const {
@@ -881,6 +894,7 @@ void EditorInterface::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_editor_viewport_2d"), &EditorInterface::get_editor_viewport_2d);
 	ClassDB::bind_method(D_METHOD("get_editor_viewport_3d", "idx"), &EditorInterface::get_editor_viewport_3d, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("get_active_node_3d"), &EditorInterface::get_active_node_3d);
+	ClassDB::bind_method(D_METHOD("keep_body_frozen_after_transform", "body"), &EditorInterface::keep_body_frozen_after_transform);
 
 	ClassDB::bind_method(D_METHOD("set_main_screen_editor", "name"), &EditorInterface::set_main_screen_editor);
 	ClassDB::bind_method(D_METHOD("set_simulation_started", "started"), &EditorInterface::set_simulation_started);
@@ -968,6 +982,8 @@ void EditorInterface::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("transform_requested"));
 	ADD_SIGNAL(MethodInfo("transform_commited"));
+	ADD_SIGNAL(MethodInfo("transform_editing_started"));
+	ADD_SIGNAL(MethodInfo("transform_editing_ended"));
 }
 
 void EditorInterface::create() {
