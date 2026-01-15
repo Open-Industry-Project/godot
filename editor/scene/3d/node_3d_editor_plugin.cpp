@@ -4655,7 +4655,7 @@ void Node3DEditorViewport::update_transform_gizmo_view() {
 	Transform3D view_rotation_xform = xform;
 	view_rotation_xform.orthonormalize();
 	bool shrink_view_ring = arc_replaces_ring >= 0 && arc_replaces_ring < 3;
-	Vector3 view_ring_scale = shrink_view_ring ? scale * spatial_editor->gizmo_view_rotation_shrink : scale;
+	Vector3 view_ring_scale = shrink_view_ring ? scale : scale / spatial_editor->gizmo_view_rotation_shrink;
 	view_rotation_xform.basis.scale(view_ring_scale);
 	RenderingServer::get_singleton()->instance_set_transform(rotate_gizmo_instance[3], view_rotation_xform);
 	RenderingServer::get_singleton()->instance_set_visible(rotate_gizmo_instance[3], show_rotate_gizmo && arc_replaces_ring != 3);
@@ -7995,8 +7995,7 @@ void fragment() {
 				for (int j = 0; j < n; ++j) {
 					Basis basis = Basis(ivec, j * step);
 
-					real_t circle_size = (i == 3) ? gizmo_view_rotation_scale : GIZMO_CIRCLE_SIZE;
-					Vector3 vertex = basis.xform(ivec2 * circle_size);
+					Vector3 vertex = basis.xform(ivec2 * GIZMO_CIRCLE_SIZE);
 
 					for (int k = 0; k < m; ++k) {
 						Vector2 ofs = Vector2(Math::cos((Math::TAU * k) / m), Math::sin((Math::TAU * k) / m));
@@ -9008,6 +9007,10 @@ void Node3DEditor::_notification(int p_what) {
 				// Update grid color by rebuilding grid.
 				_finish_grid();
 				_init_grid();
+
+				float vp_radius = (float)EDITOR_GET("editors/3d/view_plane_rotation_gizmo_scale");
+				gizmo_view_rotation_scale = GIZMO_CIRCLE_SIZE * vp_radius;
+				gizmo_view_rotation_shrink = 1.0 / vp_radius;
 
 				for (uint32_t i = 0; i < VIEWPORTS_COUNT; i++) {
 					viewports[i]->update_transform_gizmo_view();
