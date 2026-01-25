@@ -5579,7 +5579,7 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos, Node3D
 				return result.position + result.normal * offset_distance;
 			}
 		} else {
-			const Transform3D bb_transform = Transform3D(bb_basis, p_node->get_transform().origin);
+			const Transform3D bb_transform = Transform3D(bb_basis, p_node->get_global_transform().origin);
 			const AABB p_node_bb = _calculate_spatial_bounds(p_node, true, &bb_transform);
 			const float offset_distance = -p_node_bb.position.x;
 			return result.position + result.normal * offset_distance;
