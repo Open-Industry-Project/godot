@@ -307,7 +307,7 @@ public:
 
 	// Project list selection.
 
-	void select_project(int p_index, bool p_hide_focus = false);
+	void select_project(int p_index, bool p_hide_focus = false, bool p_grab_focus = true);
 	void deselect_project(int p_index);
 	void select_first_visible_project();
 	void select_all_visible_projects();

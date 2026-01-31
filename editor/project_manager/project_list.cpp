@@ -129,10 +129,14 @@ void ProjectListItemControl::_notification(int p_what) {
 				int idx = pl->get_index(this);
 				if (idx >= 0) {
 					// has_focus(true) is false on mouse-initiated focus, true on keyboard navigation.
-					pl->select_project(idx, !has_focus(true));
-					pl->ensure_project_visible(idx);
-
-					pl->emit_signal(SNAME(ProjectList::SIGNAL_SELECTION_CHANGED));
+					if (has_focus(true)) {
+						// Keyboard navigation - select with focus grab.
+						pl->select_project(idx, false);
+						pl->ensure_project_visible(idx);
+						pl->emit_signal(SNAME(ProjectList::SIGNAL_SELECTION_CHANGED));
+					}
+					// Mouse clicks are handled by _list_item_input to avoid
+					// grab_focus() interfering with child button presses.
 				}
 			}
 		} break;
@@ -1118,7 +1122,8 @@ void ProjectList::_list_item_input(const Ref<InputEvent> &p_ev, Control *p_hb) {
 
 			} else {
 				_last_clicked = clicked_project.path;
-				select_project(clicked_index, true);
+				// Pass false for p_grab_focus to avoid interfering with child button presses.
+				select_project(clicked_index, true, false);
 			}
 
 			emit_signal(SNAME(SIGNAL_SELECTION_CHANGED));
@@ -1293,12 +1298,14 @@ void ProjectList::_select_project_range(int p_begin, int p_end) {
 	}
 }
 
-void ProjectList::select_project(int p_index, bool p_hide_focus) {
+void ProjectList::select_project(int p_index, bool p_hide_focus, bool p_grab_focus) {
 	// This method keeps only one project selected.
 	_clear_project_selection();
 
 	Item &item = _projects.write[p_index];
-	item.control->grab_focus(p_hide_focus);
+	if (p_grab_focus) {
+		item.control->grab_focus(p_hide_focus);
+	}
 	_select_project_nocheck(p_index, p_hide_focus);
 }
 
