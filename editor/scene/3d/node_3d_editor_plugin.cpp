@@ -3633,6 +3633,14 @@ void Node3DEditorViewport::_notification(int p_what) {
 			cursor.region_select = false;
 			surface->queue_redraw();
 
+			if (ruler->is_inside_tree()) {
+				EditorNode::get_singleton()->get_scene_root()->remove_child(ruler);
+				ruler_start_point->set_visible(false);
+				ruler_end_point->set_visible(false);
+				ruler_label->set_visible(false);
+				collision_reposition = false;
+			}
+
 			// Commit the drag if the window is focused out.
 			if (_edit.mode != TRANSFORM_NONE) {
 				commit_transform();
