@@ -32,6 +32,8 @@
 
 #include "core/config/project_settings.h"
 #include "editor/editor_node.h"
+#include "editor/inspector/editor_inspector.h"
+#include "editor/settings/editor_settings.h"
 #include "node_3d_editor_plugin.h"
 #include "scene/gui/aspect_ratio_container.h"
 #include "scene/gui/foldable_container.h"
@@ -83,6 +85,22 @@ Camera3DEditor::Camera3DEditor() {
 }
 
 bool Camera3DPreview::camera_preview_folded = false;
+bool Camera3DPreview::camera_preview_pinned = false;
+Camera3DPreview *Camera3DPreview::pinned_instance = nullptr;
+
+void Camera3DPreview::_notification(int p_what) {
+	switch (p_what) {
+		case NOTIFICATION_READY: {
+			if (camera_preview_pinned && !pinned_instance) {
+				pin_button->set_pressed_no_signal(true);
+				callable_mp(this, &Camera3DPreview::_pin_pressed).call_deferred();
+			}
+		} break;
+		case NOTIFICATION_THEME_CHANGED: {
+			pin_button->set_button_icon(get_editor_theme_icon(SNAME("Pin")));
+		} break;
+	}
+}
 
 void Camera3DPreview::_update_sub_viewport_size() {
 	const Size2i camera_size = Node3DEditor::get_camera_viewport_size(camera);
@@ -93,8 +111,74 @@ void Camera3DPreview::_toggle_folding(bool p_folded) {
 	camera_preview_folded = p_folded;
 }
 
+void Camera3DPreview::_pin_pressed() {
+	camera_preview_pinned = pin_button->is_pressed();
+	EditorSettings::get_singleton()->set_project_metadata("camera_3d_preview", "pinned", camera_preview_pinned);
+
+	if (pin_button->is_pressed()) {
+		// Pin: reparent above the inspector scroll area.
+		Node *p = get_parent();
+		EditorInspector *inspector = nullptr;
+		while (p) {
+			inspector = Object::cast_to<EditorInspector>(p);
+			if (inspector) {
+				break;
+			}
+			p = p->get_parent();
+		}
+		ERR_FAIL_NULL(inspector);
+
+		Control *mc = Object::cast_to<Control>(inspector->get_parent());
+		ERR_FAIL_NULL(mc);
+		Control *main_vb = Object::cast_to<Control>(mc->get_parent());
+		ERR_FAIL_NULL(main_vb);
+
+		int mc_index = mc->get_index();
+		original_parent = get_parent();
+		get_parent()->remove_child(this);
+		main_vb->add_child(this);
+		main_vb->move_child(this, mc_index);
+
+		pinned_instance = this;
+	} else {
+		// Unpin: reparent back into the inspector scroll area.
+		pinned_instance = nullptr;
+
+		if (original_parent) {
+			get_parent()->remove_child(this);
+			original_parent->add_child(this);
+			Object::cast_to<Control>(original_parent)->show();
+			original_parent->move_child(this, 0);
+			original_parent = nullptr;
+		}
+	}
+}
+
+void Camera3DPreview::_camera_exited_tree() {
+	if (pinned_instance == this) {
+		callable_mp_static(&Camera3DPreview::unpin_and_free).call_deferred();
+	}
+}
+
+bool Camera3DPreview::is_pinned_for_camera(Camera3D *p_camera) {
+	return pinned_instance != nullptr && pinned_instance->camera == p_camera;
+}
+
+void Camera3DPreview::unpin_and_free() {
+	if (pinned_instance) {
+		Camera3DPreview *inst = pinned_instance;
+		pinned_instance = nullptr;
+		inst->original_parent = nullptr;
+		if (inst->get_parent()) {
+			inst->get_parent()->remove_child(inst);
+		}
+		memdelete(inst);
+	}
+}
+
 Camera3DPreview::Camera3DPreview(Camera3D *p_camera) {
 	camera = p_camera;
+	camera_preview_pinned = EditorSettings::get_singleton()->get_project_metadata("camera_3d_preview", "pinned", false);
 
 	FoldableContainer *folder = memnew(FoldableContainer);
 	folder->set_title(TTRC("Camera Preview"));
@@ -102,6 +186,13 @@ Camera3DPreview::Camera3DPreview(Camera3D *p_camera) {
 	folder->set_folded(camera_preview_folded);
 	folder->connect("folding_changed", callable_mp(this, &Camera3DPreview::_toggle_folding));
 	add_child(folder);
+
+	pin_button = memnew(Button);
+	pin_button->set_flat(true);
+	pin_button->set_toggle_mode(true);
+	pin_button->set_tooltip_text(TTR("Pin the camera preview above the inspector so it stays visible while scrolling."));
+	pin_button->connect(SceneStringName(toggled), callable_mp(this, &Camera3DPreview::_pin_pressed).unbind(1));
+	folder->add_title_bar_control(pin_button);
 
 	centering_container = memnew(AspectRatioContainer);
 	centering_container->set_custom_minimum_size(Size2(0.0, 256.0) * EDSCALE);
@@ -119,8 +210,15 @@ Camera3DPreview::Camera3DPreview(Camera3D *p_camera) {
 
 	EditorNode::get_singleton()->register_hdr_viewport(sub_viewport);
 
+	camera->connect(SceneStringName(tree_exiting), callable_mp(this, &Camera3DPreview::_camera_exited_tree));
 	ProjectSettings::get_singleton()->connect("settings_changed", callable_mp(this, &Camera3DPreview::_project_settings_changed));
 	_update_sub_viewport_size();
+}
+
+Camera3DPreview::~Camera3DPreview() {
+	if (pinned_instance == this) {
+		pinned_instance = nullptr;
+	}
 }
 
 void Camera3DPreview::_project_settings_changed() {
@@ -135,6 +233,9 @@ bool EditorInspectorPluginCamera3DPreview::can_handle(Object *p_object) {
 
 void EditorInspectorPluginCamera3DPreview::parse_begin(Object *p_object) {
 	Camera3D *camera = Object::cast_to<Camera3D>(p_object);
+	if (Camera3DPreview::is_pinned_for_camera(camera)) {
+		return;
+	}
 	Camera3DPreview *preview = memnew(Camera3DPreview(camera));
 	add_custom_control(preview);
 }
@@ -150,6 +251,7 @@ bool Camera3DEditorPlugin::handles(Object *p_object) const {
 void Camera3DEditorPlugin::make_visible(bool p_visible) {
 	if (!p_visible) {
 		Node3DEditor::get_singleton()->set_can_preview(nullptr);
+		Camera3DPreview::unpin_and_free();
 	}
 }
 

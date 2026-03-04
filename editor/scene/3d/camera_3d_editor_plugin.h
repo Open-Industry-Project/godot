@@ -57,15 +57,27 @@ class Camera3DPreview : public MarginContainer {
 	Camera3D *camera = nullptr;
 	AspectRatioContainer *centering_container = nullptr;
 	SubViewport *sub_viewport = nullptr;
+	Button *pin_button = nullptr;
 
 	static bool camera_preview_folded;
+	static bool camera_preview_pinned;
+	static Camera3DPreview *pinned_instance;
 
+	Node *original_parent = nullptr;
+
+	void _notification(int p_what);
 	void _update_sub_viewport_size();
 	void _project_settings_changed();
 	void _toggle_folding(bool p_folded);
+	void _pin_pressed();
+	void _camera_exited_tree();
 
 public:
+	static bool is_pinned_for_camera(Camera3D *p_camera);
+	static void unpin_and_free();
+
 	Camera3DPreview(Camera3D *p_camera);
+	~Camera3DPreview();
 };
 
 class EditorInspectorPluginCamera3DPreview : public EditorInspectorPluginTexture {
