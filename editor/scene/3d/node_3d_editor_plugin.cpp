@@ -751,7 +751,7 @@ void Node3DEditorViewport::_select_clicked(bool p_allow_locked) {
 	}
 }
 
-ObjectID Node3DEditorViewport::_select_ray(const Point2 &p_pos) const {
+ObjectID Node3DEditorViewport::_select_ray(const Point2 &p_pos, Vector3 *r_pos, Vector3 *r_normal) const {
 	Vector3 ray = get_ray(p_pos);
 	Vector3 pos = get_ray_pos(p_pos);
 	Vector2 shrinked_pos = p_pos;
@@ -766,6 +766,8 @@ ObjectID Node3DEditorViewport::_select_ray(const Point2 &p_pos) const {
 	ObjectID closest;
 	Node *item = nullptr;
 	float closest_dist = 1e20;
+	Vector3 closest_point;
+	Vector3 closest_normal;
 
 	Vector<Node3D *> nodes_with_gizmos = Node3DEditor::get_singleton()->gizmo_bvh_ray_query(pos, pos + ray * camera->get_far());
 
@@ -774,7 +776,36 @@ ObjectID Node3DEditorViewport::_select_ray(const Point2 &p_pos) const {
 			continue;
 		}
 
-		Vector<Ref<Node3DGizmo>> gizmos = spat->get_gizmos();
+		if (r_pos && !Object::cast_to<GeometryInstance3D>(spat)) {
+			continue;
+		}
+
+		Vector<Ref<Node3DGizmo>> gizmos = spat->get_gizmos().duplicate();
+
+		if (collision_reposition || preview_node->is_inside_tree()) {
+			Node3D *ignore_node = nullptr;
+			if (collision_reposition && !ruler->is_inside_tree()) {
+				List<Node *> selection = editor_selection->get_full_selected_node_list();
+				if (selection.size() == 1) {
+					ignore_node = Object::cast_to<Node3D>(selection.front()->get());
+				}
+			} else if (preview_node->is_inside_tree()) {
+				ignore_node = Object::cast_to<Node3D>(preview_node);
+			}
+
+			Node *current = spat;
+			bool should_skip = false;
+			while (current != nullptr) {
+				if (current == ignore_node) {
+					should_skip = true;
+					break;
+				}
+				current = current->get_parent();
+			}
+			if (should_skip) {
+				continue;
+			}
+		}
 
 		for (int j = 0; j < gizmos.size(); j++) {
 			Ref<EditorNode3DGizmo> seg = gizmos[j];
@@ -801,12 +832,14 @@ ObjectID Node3DEditorViewport::_select_ray(const Point2 &p_pos) const {
 
 			if (dist < closest_dist) {
 				item = Object::cast_to<Node>(spat);
-				if (item != edited_scene) {
+				if (item != edited_scene && !collision_reposition && !ruler->is_inside_tree() && !preview_node->is_inside_tree()) {
 					item = edited_scene->get_deepest_editable_node(item);
 				}
 
 				closest = item->get_instance_id();
 				closest_dist = dist;
+				closest_point = point;
+				closest_normal = normal;
 			}
 		}
 	}
@@ -815,6 +848,12 @@ ObjectID Node3DEditorViewport::_select_ray(const Point2 &p_pos) const {
 		return ObjectID();
 	}
 
+	if (r_pos) {
+		*r_pos = closest_point;
+	}
+	if (r_normal) {
+		*r_normal = closest_normal;
+	}
 	return closest;
 }
 
@@ -4433,7 +4472,7 @@ void Node3DEditorViewport::assign_pending_data_pointers(Node3D *p_preview_node, 
 	accept = p_accept;
 }
 
-void _insert_rid_recursive(Node *node, HashSet<RID> &rids) {
+static void _insert_rid_recursive(Node *node, HashSet<RID> &rids) {
 	CollisionObject3D *co = Object::cast_to<CollisionObject3D>(node);
 
 	if (co) {
@@ -4455,33 +4494,47 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos, Node3D
 	Vector3 world_ray = get_ray(p_pos);
 	Vector3 world_pos = get_ray_pos(p_pos);
 
-	PhysicsDirectSpaceState3D *ss = get_tree()->get_root()->get_world_3d()->get_direct_space_state();
+	Vector3 hit_pos, hit_normal;
+	bool surface_hit = false;
 
-	HashSet<RID> rids;
+	if (spatial_editor->is_snap_to_visible_geometry_enabled()) {
+		ObjectID hit_id = _select_ray(p_pos, &hit_pos, &hit_normal);
+		surface_hit = hit_id.is_valid();
+	} else {
+		PhysicsDirectSpaceState3D *ss = get_tree()->get_root()->get_world_3d()->get_direct_space_state();
 
-	if (preview_node && preview_node->get_child_count() > 0) {
-		_insert_rid_recursive(preview_node, rids);
-	} else if (!preview_node->is_inside_tree() && !ruler->is_inside_tree()) {
-		const List<Node *> &selection = editor_selection->get_top_selected_node_list();
+		HashSet<RID> rids;
 
-		Node3D *first_selected_node = Object::cast_to<Node3D>(selection.front()->get());
+		if (preview_node && preview_node->get_child_count() > 0) {
+			_insert_rid_recursive(preview_node, rids);
+		} else if (!preview_node->is_inside_tree() && !ruler->is_inside_tree()) {
+			const List<Node *> &selection = editor_selection->get_top_selected_node_list();
 
-		if (first_selected_node) {
-			_insert_rid_recursive(first_selected_node, rids);
+			Node3D *first_selected_node = Object::cast_to<Node3D>(selection.front()->get());
+
+			if (first_selected_node) {
+				_insert_rid_recursive(first_selected_node, rids);
+			}
+		}
+
+		PhysicsDirectSpaceState3D::RayParameters ray_params;
+		ray_params.exclude = rids;
+		ray_params.from = world_pos;
+		ray_params.to = world_pos + world_ray * camera->get_far();
+
+		PhysicsDirectSpaceState3D::RayResult result;
+		if (ss->intersect_ray(ray_params, result) && (preview_node->get_child_count() > 0 || !preview_node->is_inside_tree())) {
+			hit_pos = result.position;
+			hit_normal = result.normal;
+			surface_hit = true;
 		}
 	}
 
-	PhysicsDirectSpaceState3D::RayParameters ray_params;
-	ray_params.exclude = rids;
-	ray_params.from = world_pos;
-	ray_params.to = world_pos + world_ray * camera->get_far();
-
-	PhysicsDirectSpaceState3D::RayResult result;
-	if (ss->intersect_ray(ray_params, result) && (preview_node->get_child_count() > 0 || !preview_node->is_inside_tree())) {
-		// Calculate an offset for the `p_node` such that the its bounding box is on top of and touching the contact surface's plane.
+	if (surface_hit) {
+		// Calculate an offset for the `p_node` such that its bounding box is on top of and touching the contact surface's plane.
 
 		// Use the Gram-Schmidt process to get an orthonormal Basis aligned with the surface normal.
-		const Vector3 bb_basis_x = result.normal;
+		const Vector3 bb_basis_x = hit_normal;
 		Vector3 bb_basis_y = Vector3(0, 1, 0);
 		bb_basis_y = bb_basis_y - bb_basis_y.project(bb_basis_x);
 		if (bb_basis_y.is_zero_approx()) {
@@ -4498,8 +4551,7 @@ Vector3 Node3DEditorViewport::_get_instance_position(const Point2 &p_pos, Node3D
 		// The x-axis's alignment with the surface normal also makes it trivial to get the distance from `p_node`'s origin at (0, 0, 0) to the correct AABB face.
 		const float offset_distance = -p_node_bb.position.x;
 
-		// `result_offset` is in global space.
-		const Vector3 result_offset = result.position + result.normal * offset_distance;
+		const Vector3 result_offset = hit_pos + hit_normal * offset_distance;
 
 		return result_offset;
 	}
@@ -5904,7 +5956,6 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	ED_SHORTCUT("spatial_editor/reset_transform_position", TTRC("Reset Position"), KeyModifierMask::ALT + Key::W);
 	ED_SHORTCUT("spatial_editor/reset_transform_rotation", TTRC("Reset Rotation"), KeyModifierMask::ALT + Key::E);
 	ED_SHORTCUT("spatial_editor/reset_transform_scale", TTRC("Reset Scale"), KeyModifierMask::ALT + Key::R);
-
 	translation_preview_button = memnew(EditorTranslationPreviewButton);
 	hbox->add_child(translation_preview_button);
 
@@ -6690,6 +6741,7 @@ Dictionary Node3DEditor::get_state() const {
 	d["translate_snap"] = snap_translate_value;
 	d["rotate_snap"] = snap_rotate_value;
 	d["scale_snap"] = snap_scale_value;
+	d["snap_to_visible_geometry"] = snap_to_visible_geometry;
 
 	d["local_coords"] = tool_option_button[TOOL_OPT_LOCAL_COORDS]->is_pressed();
 
@@ -6782,6 +6834,12 @@ void Node3DEditor::set_state(const Dictionary &p_state) {
 
 	if (d.has("scale_snap")) {
 		snap_scale_value = d["scale_snap"];
+	}
+
+	if (d.has("snap_to_visible_geometry")) {
+		snap_to_visible_geometry = d["snap_to_visible_geometry"];
+		int idx = transform_menu->get_popup()->get_item_index(MENU_SNAP_TO_VISIBLE_GEOMETRY);
+		transform_menu->get_popup()->set_item_checked(idx, snap_to_visible_geometry);
 	}
 
 	_snap_update();
@@ -7202,6 +7260,12 @@ void Node3DEditor::_menu_item_pressed(int p_option) {
 		} break;
 		case MENU_SNAP_TO_FLOOR: {
 			snap_selected_nodes_to_floor();
+		} break;
+		case MENU_SNAP_TO_VISIBLE_GEOMETRY: {
+			snap_to_visible_geometry = !snap_to_visible_geometry;
+			int idx = transform_menu->get_popup()->get_item_index(MENU_SNAP_TO_VISIBLE_GEOMETRY);
+			transform_menu->get_popup()->set_item_checked(idx, snap_to_visible_geometry);
+			EditorSettings::get_singleton()->set_project_metadata("3d_editor", "snap_to_visible_geometry", snap_to_visible_geometry);
 		} break;
 		case MENU_LOCK_SELECTED: {
 			undo_redo->create_action(TTR("Lock Selected"));
@@ -9112,6 +9176,9 @@ void Node3DEditor::clear() {
 	snap_translate_value = EditorSettings::get_singleton()->get_project_metadata("3d_editor", "snap_translate_value", 1);
 	snap_rotate_value = EditorSettings::get_singleton()->get_project_metadata("3d_editor", "snap_rotate_value", 15);
 	snap_scale_value = EditorSettings::get_singleton()->get_project_metadata("3d_editor", "snap_scale_value", 10);
+	snap_to_visible_geometry = EditorSettings::get_singleton()->get_project_metadata("3d_editor", "snap_to_visible_geometry", false);
+	int idx = transform_menu->get_popup()->get_item_index(MENU_SNAP_TO_VISIBLE_GEOMETRY);
+	transform_menu->get_popup()->set_item_checked(idx, snap_to_visible_geometry);
 	_snap_update();
 
 	for (uint32_t i = 0; i < VIEWPORTS_COUNT; i++) {
@@ -9675,6 +9742,8 @@ Node3DEditor::Node3DEditor() {
 	p->add_shortcut(ED_SHORTCUT("spatial_editor/transform_dialog", TTRC("Transform Dialog...")), MENU_TRANSFORM_DIALOG);
 
 	p->add_separator();
+	p->add_check_item(TTRC("Snap to Visible Geometry"), MENU_SNAP_TO_VISIBLE_GEOMETRY);
+	p->set_item_tooltip(p->get_item_index(MENU_SNAP_TO_VISIBLE_GEOMETRY), TTRC("When enabled, surface snapping uses visible mesh geometry instead of collision shapes."));
 	p->add_shortcut(ED_SHORTCUT("spatial_editor/configure_snap", TTRC("Configure Snap...")), MENU_TRANSFORM_CONFIGURE_SNAP);
 
 	p->connect(SceneStringName(id_pressed), callable_mp(this, &Node3DEditor::_menu_item_pressed));

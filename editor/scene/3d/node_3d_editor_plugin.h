@@ -265,7 +265,7 @@ private:
 	void _clear_selected();
 	bool _is_rotation_arc_visible() const;
 	void _select_clicked(bool p_allow_locked);
-	ObjectID _select_ray(const Point2 &p_pos) const;
+	ObjectID _select_ray(const Point2 &p_pos, Vector3 *r_pos = nullptr, Vector3 *r_normal = nullptr) const;
 	void _find_items_at_pos(const Point2 &p_pos, Vector<_RayResult> &r_results, bool p_include_locked);
 
 	Transform3D _get_camera_transform() const;
@@ -642,6 +642,7 @@ private:
 	real_t snap_translate_value = 0;
 	real_t snap_rotate_value = 0;
 	real_t snap_scale_value = 0;
+	bool snap_to_visible_geometry = false;
 
 	Ref<ArrayMesh> active_selection_box_xray;
 	Ref<ArrayMesh> active_selection_box;
@@ -703,6 +704,7 @@ private:
 		MENU_GROUP_SELECTED,
 		MENU_UNGROUP_SELECTED,
 		MENU_SNAP_TO_FLOOR,
+		MENU_SNAP_TO_VISIBLE_GEOMETRY,
 		MENU_RULER,
 	};
 
@@ -902,6 +904,7 @@ public:
 	bool are_local_coords_enabled() const { return tool_option_button[Node3DEditor::TOOL_OPT_LOCAL_COORDS]->is_pressed(); }
 	void set_local_coords_enabled(bool on) const { tool_option_button[Node3DEditor::TOOL_OPT_LOCAL_COORDS]->set_pressed(on); }
 	bool is_snap_enabled() const { return snap_enabled ^ snap_key_enabled; }
+	bool is_snap_to_visible_geometry_enabled() const { return snap_to_visible_geometry; }
 	real_t get_translate_snap() const;
 	real_t get_rotate_snap() const;
 	real_t get_scale_snap() const;
