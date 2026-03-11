@@ -342,7 +342,9 @@ void SceneTreeEditor::_update_node_subtree(Node *p_node, TreeItem *p_parent, boo
 		is_new = true;
 	}
 
-	EditorNode::get_singleton()->update_resource_count(p_node);
+	if (is_new || I->value.dirty) {
+		EditorNode::get_singleton()->update_resource_count(p_node);
+	}
 
 	if (!(p_force || I->value.dirty)) {
 		// Nothing to do.
