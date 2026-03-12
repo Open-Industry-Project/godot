@@ -6930,11 +6930,6 @@ void Node3DEditor::_menu_item_toggled(bool pressed, int p_option) {
 
 		case MENU_TOOL_PRESERVE_CHILDREN_TRANSFORM: {
 			tool_option_button[TOOL_OPT_PRESERVE_CHILDREN_TRANSFORM]->set_pressed(pressed);
-			if (pressed) {
-				EditorNode::get_editor_data().add_undo_redo_inspector_hook_callback(callable_mp(this, &Node3DEditor::_undo_redo_inspector_callback));
-			} else {
-				EditorNode::get_editor_data().remove_undo_redo_inspector_hook_callback(callable_mp(this, &Node3DEditor::_undo_redo_inspector_callback));
-			}
 		} break;
 	}
 }
@@ -6957,16 +6952,22 @@ void Node3DEditor::_undo_redo_inspector_callback(Object *p_undo_redo, Object *p_
 		return;
 	}
 
-	EditorUndoRedoManager *undo_redo = Object::cast_to<EditorUndoRedoManager>(p_undo_redo);
-	ERR_FAIL_NULL(undo_redo);
+	for (uint32_t i = 0; i < VIEWPORTS_COUNT; i++) {
+		viewports[i]->_reset_follow_mode_count();
+	}
 
-	int child_count = node->get_child_count();
-	for (int i = 0; i < child_count; i++) {
-		Node3D *child = Object::cast_to<Node3D>(node->get_child(i));
-		if (child) {
-			Transform3D child_global = child->get_global_transform();
-			undo_redo->add_do_method(child, "set_global_transform", child_global);
-			undo_redo->add_undo_method(child, "set_global_transform", child_global);
+	if (is_preserve_children_transform_enabled()) {
+		EditorUndoRedoManager *undo_redo = Object::cast_to<EditorUndoRedoManager>(p_undo_redo);
+		ERR_FAIL_NULL(undo_redo);
+
+		int child_count = node->get_child_count();
+		for (int i = 0; i < child_count; i++) {
+			Node3D *child = Object::cast_to<Node3D>(node->get_child(i));
+			if (child) {
+				Transform3D child_global = child->get_global_transform();
+				undo_redo->add_do_method(child, "set_global_transform", child_global);
+				undo_redo->add_undo_method(child, "set_global_transform", child_global);
+			}
 		}
 	}
 }
@@ -9546,6 +9547,8 @@ Node3DEditor::Node3DEditor() {
 	tool_option_button[TOOL_OPT_PRESERVE_CHILDREN_TRANSFORM]->set_shortcut_context(this);
 	tool_option_button[TOOL_OPT_PRESERVE_CHILDREN_TRANSFORM]->set_accessibility_name(TTRC("Preserve Children Transform"));
 	tool_option_button[TOOL_OPT_PRESERVE_CHILDREN_TRANSFORM]->set_tooltip_text(TTRC("When enabled, transforming a node will preserve the global transform of its children.\nThis also applies when editing transform properties in the Inspector."));
+
+	EditorNode::get_editor_data().add_undo_redo_inspector_hook_callback(callable_mp(this, &Node3DEditor::_undo_redo_inspector_callback));
 
 	main_menu_hbox->add_child(memnew(VSeparator));
 	sun_button = memnew(Button);
