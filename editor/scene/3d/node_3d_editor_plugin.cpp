@@ -6346,7 +6346,6 @@ void Node3DEditorViewport::commit_transform() {
 
 	if (freeze) {
 		freeze = false;
-		const List<Node *> &selection = editor_selection->get_top_selected_node_list();
 		for (Node *E : selection) {
 			Array children = E->get_children();
 
