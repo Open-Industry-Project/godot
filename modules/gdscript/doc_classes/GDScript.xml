@@ -24,4 +24,10 @@
 			</description>
 		</method>
 	</methods>
+	<signals>
+		<signal name="reloaded">
+			<description>
+			</description>
+		</signal>
+	</signals>
 </class>

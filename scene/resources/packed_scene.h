@@ -303,7 +303,7 @@ public:
 
 #ifndef DISABLE_DEPRECATED
 private:
-	Node *_instantiate_bind_compat_107818(GenEditState p_edit_state);
+	Node *_instantiate_bind_compat_107818(GenEditState p_edit_state) const;
 	static void _bind_compatibility_methods();
 
 public:

@@ -1,0 +1,6 @@
+GH-107818
+---------
+Validate extension JSON: Error: Field 'classes/PackedScene/methods/instantiate/arguments': size changed value in new API, from 1 to 2.
+Validate extension JSON: Error: Hash changed for 'classes/PackedScene/methods/instantiate', from 9CAFF9D7 to 0ABB5488. This means that the function has changed and no compatibility function was provided.
+
+Optional argument added. Compatibility method registered.

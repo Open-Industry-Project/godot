@@ -30,7 +30,7 @@
 
 #ifndef DISABLE_DEPRECATED
 
-Node *PackedScene::_instantiate_bind_compat_107818(GenEditState p_edit_state) {
+Node *PackedScene::_instantiate_bind_compat_107818(GenEditState p_edit_state) const {
 	return instantiate(p_edit_state, INSTANTIATION_DEFAULT);
 }
 
