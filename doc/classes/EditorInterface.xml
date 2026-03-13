@@ -307,6 +307,11 @@
 				Returns mesh previews rendered at the given size as an [Array] of [Texture2D]s.
 			</description>
 		</method>
+		<method name="mark_scene_as_saved">
+			<return type="void" />
+			<description>
+			</description>
+		</method>
 		<method name="mark_scene_as_unsaved">
 			<return type="void" />
 			<description>
@@ -534,6 +539,12 @@
 				Sets the enabled status of a plugin. The plugin name is the same as its directory name.
 			</description>
 		</method>
+		<method name="set_simulation_started">
+			<return type="void" />
+			<param index="0" name="started" type="bool" />
+			<description>
+			</description>
+		</method>
 		<method name="stop_playing_scene">
 			<return type="void" />
 			<description>
@@ -549,4 +560,14 @@
 			If [code]true[/code], the Movie Maker mode is enabled in the editor. See [MovieWriter] for more information.
 		</member>
 	</members>
+	<signals>
+		<signal name="transform_commited">
+			<description>
+			</description>
+		</signal>
+		<signal name="transform_requested">
+			<description>
+			</description>
+		</signal>
+	</signals>
 </class>
