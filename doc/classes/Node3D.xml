@@ -14,6 +14,27 @@
 		<link title="All 3D Demos">https://github.com/godotengine/godot-demo-projects/tree/master/3d</link>
 	</tutorials>
 	<methods>
+		<method name="_collision_repositioned" qualifiers="virtual">
+			<return type="void" />
+			<param index="0" name="collision_point" type="Vector3" />
+			<param index="1" name="collision_normal" type="Vector3" />
+			<description>
+				Called by the editor during and after a collision reposition operation (Shift+G). [param collision_point] is the world-space point on the surface, and [param collision_normal] is the surface normal at that point. Override this to update internal state (e.g. a floor plane reference) when the node is placed on a surface.
+			</description>
+		</method>
+		<method name="_collision_repositioned_save" qualifiers="virtual">
+			<return type="Variant" />
+			<description>
+				Called by the editor at the start of a collision reposition operation to capture undo data. Return any state that should be restored if the operation is undone or cancelled.
+			</description>
+		</method>
+		<method name="_collision_repositioned_undo" qualifiers="virtual">
+			<return type="void" />
+			<param index="0" name="saved_data" type="Variant" />
+			<description>
+				Called by the editor when a collision reposition operation is undone or cancelled. [param saved_data] is the value previously returned by [method _collision_repositioned_save]. Override this to restore internal state.
+			</description>
+		</method>
 		<method name="add_gizmo">
 			<return type="void" />
 			<param index="0" name="gizmo" type="Node3DGizmo" />

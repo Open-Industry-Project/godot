@@ -250,6 +250,10 @@ private:
 	Transform3D collision_reposition_original_transform;
 	bool collision_reposition_normal_applied = false;
 	int collision_reposition_alignment_axis = 1; // 0=X, 1=Y, 2=Z, 3=-X, 4=-Y, 5=-Z
+	Vector3 collision_reposition_last_point;
+	Vector3 collision_reposition_last_normal;
+	AABB cached_collision_reposition_bounds;
+	HashMap<Node3D *, Variant> collision_reposition_undo_data;
 	real_t gizmo_scale;
 
 	bool vertex_snap_mode = false;
@@ -473,6 +477,7 @@ private:
 	struct CollisionResult {
 		Vector3 position;
 		Vector3 normal;
+		Vector3 surface_point;
 		bool has_collision = false;
 	};
 

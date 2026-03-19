@@ -98,6 +98,7 @@
 #include "scene/3d/mesh_instance_3d.h"
 #include "scene/3d/physics/collision_shape_3d.h"
 #include "scene/3d/physics/physics_body_3d.h"
+#include "scene/3d/physics/rigid_body_3d.h"
 #include "scene/3d/sprite_3d.h"
 #include "scene/3d/visual_instance_3d.h"
 #include "scene/3d/world_environment.h"
@@ -114,7 +115,6 @@
 #include "scene/resources/sky.h"
 #include "scene/resources/surface_tool.h"
 #include "servers/rendering/rendering_server.h"
-#include <scene/3d/physics/rigid_body_3d.h>
 
 constexpr real_t GIZMO_ARROW_SIZE = 0.35;
 constexpr real_t GIZMO_RING_HALF_WIDTH = 0.1;
@@ -632,6 +632,15 @@ void Node3DEditorViewport::cancel_transform() {
 
 	for (const KeyValue<Node3D *, Transform3D> &pair : _edit.children_original_globals) {
 		pair.key->set_global_transform(pair.value);
+	}
+
+	if (collision_reposition) {
+		for (const KeyValue<Node3D *, Variant> &kv : collision_reposition_undo_data) {
+			Node3D *sp = kv.key;
+			if (sp && sp->has_method("_collision_repositioned_undo")) {
+				sp->call("_collision_repositioned_undo", kv.value);
+			}
+		}
 	}
 
 	collision_reposition = false;
@@ -3054,6 +3063,27 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 					_edit.mode = TRANSFORM_TRANSLATE;
 					collision_reposition = true;
 
+					{
+						const List<Node *> &sel = editor_selection->get_top_selected_node_list();
+						Node3D *bounds_node = nullptr;
+						if (sel.size() == 1) {
+							bounds_node = Object::cast_to<Node3D>(sel.front()->get());
+						} else {
+							bounds_node = spatial_editor->get_active_node();
+						}
+						if (bounds_node) {
+							cached_collision_reposition_bounds = _calculate_spatial_bounds(bounds_node, true);
+						}
+
+						collision_reposition_undo_data.clear();
+						for (Node *E : sel) {
+							Node3D *sp = Object::cast_to<Node3D>(E);
+							if (sp && sp->has_method("_collision_repositioned_save")) {
+								collision_reposition_undo_data[sp] = sp->call("_collision_repositioned_save");
+							}
+						}
+					}
+
 					if (!freeze) {
 						const List<Node *> &selection = editor_selection->get_top_selected_node_list();
 						for (Node *E : selection) {
@@ -3945,6 +3975,20 @@ void Node3DEditorViewport::_notification(int p_what) {
 									}
 								}
 
+								if (collision_result.has_collision) {
+									collision_reposition_last_point = collision_result.surface_point;
+									collision_reposition_last_normal = collision_result.normal;
+									if (active_node->has_method("_collision_repositioned")) {
+										active_node->call("_collision_repositioned", collision_result.surface_point, collision_result.normal);
+									}
+									for (Node *E : selection) {
+										Node3D *sp = Object::cast_to<Node3D>(E);
+										if (sp && sp != active_node && sp->has_method("_collision_repositioned")) {
+											sp->call("_collision_repositioned", collision_result.surface_point, collision_result.normal);
+										}
+									}
+								}
+
 								if (!ruler->is_inside_tree()) {
 									double snap = EDITOR_GET("interface/inspector/default_float_step");
 									int snap_step_decimals = Math::range_step_decimals(snap);
@@ -4035,6 +4079,14 @@ void Node3DEditorViewport::_notification(int p_what) {
 						selected_node->set_global_transform(transform);
 						collision_reposition_normal_applied = false;
 						collision_reposition_alignment_axis = 1;
+					}
+
+					if (collision_result.has_collision) {
+						collision_reposition_last_point = collision_result.surface_point;
+						collision_reposition_last_normal = collision_result.normal;
+						if (selected_node->has_method("_collision_repositioned")) {
+							selected_node->call("_collision_repositioned", collision_result.surface_point, collision_result.normal);
+						}
 					}
 
 					if (!ruler->is_inside_tree()) {
@@ -5701,6 +5753,7 @@ Node3DEditorViewport::CollisionResult Node3DEditorViewport::_get_instance_positi
 	if (ss->intersect_ray(ray_params, ray_result) && (preview_node->get_child_count() > 0 || !preview_node->is_inside_tree())) {
 		result.has_collision = true;
 		result.normal = ray_result.normal;
+		result.surface_point = ray_result.position;
 
 		// Calculate an offset for the `p_node` such that the its bounding box is on top of and touching the contact surface's plane.
 
@@ -5753,7 +5806,13 @@ Node3DEditorViewport::CollisionResult Node3DEditorViewport::_get_instance_positi
 			}
 		} else {
 			const Transform3D bb_transform = Transform3D(bb_basis, p_node->get_global_transform().origin);
-			const AABB p_node_bb = _calculate_spatial_bounds(p_node, true, &bb_transform);
+			AABB p_node_bb;
+			if (collision_reposition) {
+				const Transform3D xform_to_bb = bb_transform.affine_inverse() * p_node->get_global_transform();
+				p_node_bb = xform_to_bb.xform(cached_collision_reposition_bounds);
+			} else {
+				p_node_bb = _calculate_spatial_bounds(p_node, true, &bb_transform);
+			}
 			const float offset_distance = -p_node_bb.position.x;
 			result.position = ray_result.position + ray_result.normal * offset_distance;
 			return result;
@@ -6496,7 +6555,13 @@ void Node3DEditorViewport::commit_transform() {
 		}
 
 		undo_redo->add_do_method(sp, "set_transform", sp->get_local_gizmo_transform());
+		if (collision_reposition && sp->has_method("_collision_repositioned")) {
+			undo_redo->add_do_method(sp, "_collision_repositioned", collision_reposition_last_point, collision_reposition_last_normal);
+		}
 		undo_redo->add_undo_method(sp, "set_transform", se->original_local);
+		if (collision_reposition && collision_reposition_undo_data.has(sp)) {
+			undo_redo->add_undo_method(sp, "_collision_repositioned_undo", collision_reposition_undo_data[sp]);
+		}
 	}
 
 	if (!_edit.children_original_globals.is_empty()) {
