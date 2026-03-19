@@ -1547,6 +1547,10 @@ void Node3D::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::NODE_PATH, "visibility_parent", PROPERTY_HINT_NODE_PATH_VALID_TYPES, "GeometryInstance3D"), "set_visibility_parent", "get_visibility_parent");
 
 	ADD_SIGNAL(MethodInfo("visibility_changed"));
+
+	GDVIRTUAL_BIND(_collision_repositioned, "collision_point", "collision_normal");
+	GDVIRTUAL_BIND(_collision_repositioned_save);
+	GDVIRTUAL_BIND(_collision_repositioned_undo, "saved_data");
 }
 
 Node3D::Node3D() :

@@ -222,6 +222,10 @@ protected:
 	virtual void fti_pump_xform();
 	virtual void fti_pump_property() {}
 
+	GDVIRTUAL2(_collision_repositioned, Vector3, Vector3)
+	GDVIRTUAL0R(Variant, _collision_repositioned_save)
+	GDVIRTUAL1(_collision_repositioned_undo, Variant)
+
 	void _notification(int p_what);
 	static void _bind_methods();
 
