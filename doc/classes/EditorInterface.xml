@@ -299,6 +299,18 @@
 				Returns [code]true[/code] if the specified [param plugin] is enabled. The plugin name is the same as its directory name.
 			</description>
 		</method>
+		<method name="is_simulation_paused" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the in-editor simulation is currently paused.
+			</description>
+		</method>
+		<method name="is_simulation_running" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the in-editor simulation is currently running.
+			</description>
+		</method>
 		<method name="make_mesh_previews">
 			<return type="Texture2D[]" />
 			<param index="0" name="meshes" type="Mesh[]" />
@@ -545,10 +557,28 @@
 			<description>
 			</description>
 		</method>
+		<method name="start_simulation">
+			<return type="void" />
+			<description>
+				Starts the in-editor simulation.
+			</description>
+		</method>
 		<method name="stop_playing_scene">
 			<return type="void" />
 			<description>
 				Stops the scene that is currently playing.
+			</description>
+		</method>
+		<method name="stop_simulation">
+			<return type="void" />
+			<description>
+				Stops the in-editor simulation.
+			</description>
+		</method>
+		<method name="toggle_pause_simulation">
+			<return type="void" />
+			<description>
+				Toggles the pause state of the in-editor simulation.
 			</description>
 		</method>
 	</methods>
@@ -561,6 +591,22 @@
 		</member>
 	</members>
 	<signals>
+		<signal name="simulation_pause_toggled">
+			<param index="0" name="paused" type="bool" />
+			<description>
+				Emitted when the in-editor simulation pause state is toggled.
+			</description>
+		</signal>
+		<signal name="simulation_started">
+			<description>
+				Emitted when the in-editor simulation starts.
+			</description>
+		</signal>
+		<signal name="simulation_stopped">
+			<description>
+				Emitted when the in-editor simulation stops.
+			</description>
+		</signal>
 		<signal name="transform_commited">
 			<description>
 			</description>

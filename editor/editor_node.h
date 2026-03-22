@@ -92,9 +92,11 @@ class EditorSceneTabs;
 class EditorSelectionHistory;
 class EditorSettingsDialog;
 class EditorTitleBar;
+class EditorSimulationRunBar;
 class ExportTemplateManager;
 class EditorQuickOpenDialog;
 class FBXImporterManager;
+class OIPTimeScaleButton;
 class FileSystemDock;
 class HistoryDock;
 class OrphanResourcesDialog;
@@ -214,6 +216,9 @@ public:
 		SPINNER_UPDATE_CONTINUOUSLY,
 		SPINNER_UPDATE_WHEN_CHANGED,
 		SPINNER_UPDATE_SPINNER_HIDE,
+
+		// OIP mode.
+		OIP_TOGGLE_NATIVE_UI,
 
 		// Non-menu options.
 		SCENE_TAB_CLOSE,
@@ -471,6 +476,22 @@ private:
 	EditorProgress *save_scene_progress = nullptr;
 
 	bool simulation_started = false;
+
+	// OIP mode.
+	bool oip_mode_active = false;
+	EditorSimulationRunBar *simulation_run_bar = nullptr;
+	OIPTimeScaleButton *oip_time_scale_button = nullptr;
+	Button *oip_view_toggle_button = nullptr;
+	PopupMenu *oip_help_menu = nullptr;
+
+	void _enter_oip_mode();
+	void _exit_oip_mode();
+	void _toggle_oip_mode();
+	void _build_oip_help_menu();
+	void _oip_scene_changed();
+	void _oip_view_toggle_pressed();
+	void _oip_view_toggle_update_icon();
+	void _oip_help_menu_id_pressed(int p_id);
 
 	DynamicFontImportSettingsDialog *fontdata_import_settings = nullptr;
 	SceneImportSettingsDialog *scene_import_settings = nullptr;
@@ -753,6 +774,9 @@ public:
 	static EditorFolding &get_editor_folding() { return singleton->editor_folding; }
 
 	static EditorTitleBar *get_title_bar() { return singleton->title_bar; }
+	static MenuBar *get_menu_bar() { return singleton->main_menu_bar; }
+	static EditorRunBar *get_run_bar() { return singleton->project_run_bar; }
+	static HBoxContainer *get_renderer_selection() { return singleton->right_menu_hb; }
 	static VSplitContainer *get_top_split() { return singleton->top_split; }
 	static DockSplitContainer *get_center_split() { return singleton->center_split; }
 	static EditorBottomPanel *get_bottom_panel() { return singleton->bottom_panel; }
@@ -806,6 +830,7 @@ public:
 	ProjectSettingsEditor *get_project_settings() { return project_settings_editor; }
 
 	void set_simulation_started(bool p_started) { simulation_started = p_started; }
+	EditorSimulationRunBar *get_simulation_run_bar() const { return simulation_run_bar; }
 
 	void trigger_menu_option(int p_option, bool p_confirmed);
 	bool has_previous_closed_scenes() const;
