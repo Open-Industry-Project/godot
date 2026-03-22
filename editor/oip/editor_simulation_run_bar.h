@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  editor_main_screen.h                                                  */
+/*  editor_simulation_run_bar.h                                           */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -33,61 +33,38 @@
 #include "scene/gui/panel_container.h"
 
 class Button;
-class ConfigFile;
-class EditorPlugin;
 class HBoxContainer;
-class VBoxContainer;
 
-class EditorMainScreen : public PanelContainer {
-	GDCLASS(EditorMainScreen, PanelContainer);
+class EditorSimulationRunBar : public PanelContainer {
+	GDCLASS(EditorSimulationRunBar, PanelContainer);
 
-public:
-	enum EditorTable {
-		EDITOR_2D = 0,
-		EDITOR_3D,
-		EDITOR_SCRIPT,
-		EDITOR_GAME,
-		EDITOR_ASSETLIB,
-	};
+	Button *play_button = nullptr;
+	Button *pause_button = nullptr;
+	Button *stop_button = nullptr;
+	HBoxContainer *hbox = nullptr;
 
-private:
-	VBoxContainer *main_screen_vbox = nullptr;
-	EditorPlugin *selected_plugin = nullptr;
+	bool simulation_running = false;
+	bool simulation_paused = false;
 
-	HBoxContainer *button_hb = nullptr;
-	Vector<Button *> buttons;
-	Vector<EditorPlugin *> editor_table;
-	HashMap<String, EditorPlugin *> main_editor_plugins;
-
-	int _get_current_main_editor() const;
+	void _on_play_pressed();
+	void _on_pause_toggled(bool p_pressed);
+	void _on_stop_pressed();
+	void _update_shortcut_tooltips();
 
 protected:
 	void _notification(int p_what);
+	static void _bind_methods();
 
 public:
-	void set_button_container(HBoxContainer *p_button_hb);
-	HBoxContainer *get_button_container() const { return button_hb; }
+	void start_simulation();
+	void stop_simulation();
+	void toggle_pause_simulation();
 
-	void save_layout_to_config(Ref<ConfigFile> p_config_file, const String &p_section) const;
-	void load_layout_from_config(Ref<ConfigFile> p_config_file, const String &p_section);
+	bool is_simulation_running() const { return simulation_running; }
+	bool is_simulation_paused() const { return simulation_paused; }
 
-	void set_button_enabled(int p_index, bool p_enabled);
-	bool is_button_enabled(int p_index) const;
+	void enable_buttons();
+	void disable_buttons();
 
-	void select_next();
-	void select_prev();
-	void select_by_name(const String &p_name);
-	void select(int p_index);
-	int get_selected_index() const;
-	int get_plugin_index(EditorPlugin *p_editor) const;
-	EditorPlugin *get_selected_plugin() const;
-	EditorPlugin *get_plugin_by_name(const String &p_plugin_name) const;
-	bool can_auto_switch_screens() const;
-
-	VBoxContainer *get_control() const;
-
-	void add_main_plugin(EditorPlugin *p_editor);
-	void remove_main_plugin(EditorPlugin *p_editor);
-
-	EditorMainScreen();
+	EditorSimulationRunBar();
 };

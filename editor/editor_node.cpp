@@ -115,6 +115,8 @@
 #include "editor/inspector/editor_resource_picker.h"
 #include "editor/inspector/editor_resource_preview.h"
 #include "editor/inspector/multi_node_edit.h"
+#include "editor/oip/editor_simulation_run_bar.h"
+#include "editor/oip/oip_time_scale_button.h"
 #include "editor/plugins/editor_plugin.h"
 #include "editor/plugins/editor_plugin_list.h"
 #include "editor/plugins/editor_resource_conversion_plugin.h"
@@ -3899,6 +3901,11 @@ void EditorNode::_menu_option_confirm(int p_option, bool p_confirmed) {
 			fbx_importer_manager->show_dialog();
 #endif
 		} break;
+		case OIP_TOGGLE_NATIVE_UI: {
+			int idx = settings_menu->get_item_index(OIP_TOGGLE_NATIVE_UI);
+			settings_menu->set_item_checked(idx, !settings_menu->is_item_checked(idx));
+			_toggle_oip_mode();
+		} break;
 		case EDITOR_MANAGE_FEATURE_PROFILES: {
 			feature_profile_manager->popup_centered_clamped(Size2(900, 800) * EDSCALE, 0.8);
 		} break;
@@ -4637,6 +4644,8 @@ void EditorNode::set_edited_scene_root(Node *p_scene, bool p_auto_add) {
 	if (p_auto_add && p_scene) {
 		scene_root->add_child(p_scene, true);
 	}
+
+	_oip_scene_changed();
 }
 
 String EditorNode::get_preview_locale() const {
@@ -4735,6 +4744,10 @@ void EditorNode::_set_current_scene(int p_idx) {
 }
 
 void EditorNode::_set_current_scene_nocheck(int p_idx, bool p_ignore_state) {
+	if (oip_mode_active && simulation_run_bar && simulation_run_bar->is_simulation_running()) {
+		simulation_run_bar->stop_simulation();
+	}
+
 	// Save the folding in case the scene gets reloaded.
 	const String scene_path = editor_data.get_scene_path(p_idx);
 	if (scene_path.is_empty() && editor_data.get_edited_scene_root(p_idx)) {
@@ -4786,6 +4799,8 @@ void EditorNode::_set_current_scene_nocheck(int p_idx, bool p_ignore_state) {
 
 	const Dictionary state = editor_data.restore_edited_scene_state(editor_selection, &editor_history);
 	_set_main_scene_state(state);
+
+	_oip_scene_changed();
 	_update_undo_redo_allowed();
 	_update_unsaved_cache();
 
@@ -6360,6 +6375,8 @@ void EditorNode::_load_editor_layout() {
 	}
 	load_editor_layout_done = true;
 	emit_signal(SNAME("editor_layout_loaded"));
+
+	_enter_oip_mode();
 }
 
 void EditorNode::_save_central_editor_layout_to_config(Ref<ConfigFile> p_config_file) {
@@ -8005,6 +8022,172 @@ void EditorNode::set_unfocused_low_processor_usage_mode_enabled(bool p_enabled) 
 	unfocused_low_processor_usage_mode_enabled = p_enabled;
 }
 
+// OIP mode.
+
+enum OIPHelpItem {
+	OIP_HELP_SEARCH = 0,
+	OIP_HELP_ONLINE_DOCS = 1,
+	OIP_HELP_COPY_SYSTEM_INFO = 2,
+};
+
+void EditorNode::_build_oip_help_menu() {
+	if (!oip_help_menu) {
+		oip_help_menu = memnew(PopupMenu);
+		oip_help_menu->connect(SceneStringName(id_pressed), callable_mp(this, &EditorNode::_oip_help_menu_id_pressed));
+	}
+	oip_help_menu->clear(false);
+	oip_help_menu->set_name("Help");
+
+	oip_help_menu->add_icon_shortcut(get_editor_theme_native_menu_icon(SNAME("HelpSearch"), false, false), ED_GET_SHORTCUT("editor/editor_help"), OIP_HELP_SEARCH);
+	oip_help_menu->add_separator();
+	oip_help_menu->add_icon_item(gui_base->get_theme_icon(SNAME("ExternalLink"), EditorStringName(EditorIcons)), "Online Documentation", OIP_HELP_ONLINE_DOCS);
+	oip_help_menu->add_icon_item(gui_base->get_theme_icon(SNAME("ActionCopy"), EditorStringName(EditorIcons)), "Copy System Info", OIP_HELP_COPY_SYSTEM_INFO);
+}
+
+void EditorNode::_oip_help_menu_id_pressed(int p_id) {
+	switch (p_id) {
+		case OIP_HELP_SEARCH: {
+			_menu_option_confirm(HELP_SEARCH, false);
+		} break;
+		case OIP_HELP_ONLINE_DOCS: {
+			OS::get_singleton()->shell_open("https://github.com/Open-Industry-Project/Open-Industry-Project");
+		} break;
+		case OIP_HELP_COPY_SYSTEM_INFO: {
+			String info = _get_system_info();
+			DisplayServer::get_singleton()->clipboard_set(info);
+		} break;
+	}
+}
+
+void EditorNode::_oip_view_toggle_pressed() {
+	if (editor_main_screen->get_selected_index() == EditorMainScreen::EDITOR_SCRIPT) {
+		oip_view_toggle_button->set_button_icon(gui_base->get_theme_icon(SNAME("Script"), EditorStringName(EditorIcons)));
+		editor_main_screen->select_by_name("3D");
+	} else {
+		oip_view_toggle_button->set_button_icon(gui_base->get_theme_icon(SNAME("3D"), EditorStringName(EditorIcons)));
+		editor_main_screen->select_by_name("Script");
+	}
+}
+
+void EditorNode::_oip_view_toggle_update_icon() {
+	if (editor_main_screen->get_selected_index() == EditorMainScreen::EDITOR_SCRIPT) {
+		oip_view_toggle_button->set_button_icon(gui_base->get_theme_icon(SNAME("3D"), EditorStringName(EditorIcons)));
+	} else {
+		oip_view_toggle_button->set_button_icon(gui_base->get_theme_icon(SNAME("Script"), EditorStringName(EditorIcons)));
+	}
+}
+
+void EditorNode::_oip_scene_changed() {
+	if (!oip_mode_active || !simulation_run_bar) {
+		return;
+	}
+
+	if (get_edited_scene()) {
+		simulation_run_bar->enable_buttons();
+	} else {
+		simulation_run_bar->disable_buttons();
+	}
+}
+
+void EditorNode::_enter_oip_mode() {
+	if (oip_mode_active) {
+		return;
+	}
+	oip_mode_active = true;
+
+	editor_main_screen->select_by_name("3D");
+
+	HBoxContainer *main_screen_buttons = editor_main_screen->get_button_container();
+	if (main_screen_buttons) {
+		main_screen_buttons->set_visible(false);
+	}
+	project_run_bar->set_visible(false);
+	right_menu_hb->set_visible(false);
+	title_bar->set_center_control(simulation_run_bar);
+
+	if (main_menu_bar) {
+		_build_oip_help_menu();
+
+		for (int i = 0; i < main_menu_bar->get_child_count(); i++) {
+			PopupMenu *popup = Object::cast_to<PopupMenu>(main_menu_bar->get_child(i));
+			if (!popup) {
+				continue;
+			}
+			String name = popup->get_name();
+			if (name == "Debug") {
+				main_menu_bar->set_menu_hidden(i, true);
+			} else if (name == "Help") {
+				main_menu_bar->set_menu_hidden(i, true);
+				popup->set_name("HelpNative");
+			}
+		}
+
+		main_menu_bar->add_child(oip_help_menu);
+	}
+
+	simulation_run_bar->set_visible(true);
+	oip_time_scale_button->set_visible(true);
+	oip_view_toggle_button->set_visible(true);
+	oip_view_toggle_button->set_button_icon(gui_base->get_theme_icon(SNAME("Script"), EditorStringName(EditorIcons)));
+
+	if (get_edited_scene()) {
+		simulation_run_bar->enable_buttons();
+	} else {
+		simulation_run_bar->disable_buttons();
+	}
+
+	EditorSettings::get_singleton()->set_setting("interface/editor/update_continuously", true);
+}
+
+void EditorNode::_exit_oip_mode() {
+	if (!oip_mode_active) {
+		return;
+	}
+
+	if (simulation_run_bar && simulation_run_bar->is_simulation_running()) {
+		simulation_run_bar->stop_simulation();
+	}
+
+	oip_mode_active = false;
+
+	HBoxContainer *main_screen_buttons = editor_main_screen->get_button_container();
+	if (main_screen_buttons) {
+		main_screen_buttons->set_visible(true);
+	}
+	project_run_bar->set_visible(true);
+	right_menu_hb->set_visible(true);
+	title_bar->set_center_control(main_screen_buttons);
+
+	if (main_menu_bar) {
+		if (oip_help_menu->get_parent() == main_menu_bar) {
+			main_menu_bar->remove_child(oip_help_menu);
+		}
+
+		for (int i = 0; i < main_menu_bar->get_child_count(); i++) {
+			PopupMenu *popup = Object::cast_to<PopupMenu>(main_menu_bar->get_child(i));
+			if (!popup) {
+				continue;
+			}
+			if (popup->get_name() == "HelpNative") {
+				popup->set_name("Help");
+			}
+			main_menu_bar->set_menu_hidden(i, false);
+		}
+	}
+
+	simulation_run_bar->set_visible(false);
+	oip_time_scale_button->set_visible(false);
+	oip_view_toggle_button->set_visible(false);
+}
+
+void EditorNode::_toggle_oip_mode() {
+	if (oip_mode_active) {
+		_exit_oip_mode();
+	} else {
+		_enter_oip_mode();
+	}
+}
+
 void EditorNode::_build_file_menu() {
 	if (!file_menu) {
 		return;
@@ -8151,6 +8334,9 @@ void EditorNode::_build_settings_menu() {
 #if !defined(ANDROID_ENABLED) && !defined(WEB_ENABLED)
 	settings_menu->add_item(TTRC("Configure FBX Importer..."), EDITOR_CONFIGURE_FBX_IMPORTER);
 #endif
+
+	settings_menu->add_separator();
+	settings_menu->add_check_item("Toggle Godot Native UI", OIP_TOGGLE_NATIVE_UI);
 }
 
 void EditorNode::_build_help_menu() {
@@ -8223,6 +8409,9 @@ void EditorNode::_update_main_menu_type() {
 			if (menu->get_parent() == main_menu_bar) {
 				main_menu_bar->remove_child(menu);
 			}
+		}
+		if (oip_help_menu && oip_help_menu->get_parent() == main_menu_bar) {
+			main_menu_bar->remove_child(oip_help_menu);
 		}
 		memdelete(main_menu_bar);
 		main_menu_bar = nullptr;
@@ -9115,6 +9304,31 @@ EditorNode::EditorNode() {
 	renderer->set_accessibility_name(TTRC("Renderer"));
 
 	right_menu_hb->add_child(renderer);
+
+	// OIP mode.
+	simulation_run_bar = memnew(EditorSimulationRunBar);
+	simulation_run_bar->set_name("EditorSimulationRunBar");
+	title_bar->add_child(simulation_run_bar);
+	title_bar->move_child(simulation_run_bar, main_editor_button_hb->get_index() + 1);
+	title_bar->set_center_control(simulation_run_bar);
+
+	simulation_run_bar->connect(SNAME("simulation_started"), callable_mp(EditorInterface::get_singleton(), &EditorInterface::_on_simulation_started));
+	simulation_run_bar->connect(SNAME("simulation_stopped"), callable_mp(EditorInterface::get_singleton(), &EditorInterface::_on_simulation_stopped));
+	simulation_run_bar->connect(SNAME("simulation_pause_toggled"), callable_mp(EditorInterface::get_singleton(), &EditorInterface::_on_simulation_pause_toggled));
+
+	main_editor_button_hb->set_visible(false);
+	project_run_bar->set_visible(false);
+	right_menu_hb->set_visible(false);
+
+	oip_time_scale_button = memnew(OIPTimeScaleButton);
+	title_bar->add_child(oip_time_scale_button);
+
+	oip_view_toggle_button = memnew(Button);
+	oip_view_toggle_button->set_tooltip_text("Toggle Script/3D");
+	oip_view_toggle_button->set_flat(true);
+	oip_view_toggle_button->connect(SceneStringName(pressed), callable_mp(this, &EditorNode::_oip_view_toggle_pressed));
+	oip_view_toggle_button->connect(SNAME("theme_changed"), callable_mp(this, &EditorNode::_oip_view_toggle_update_icon));
+	title_bar->add_child(oip_view_toggle_button);
 
 	if (can_expand) {
 		// Add spacer to avoid other controls under the window minimize/maximize/close buttons (right side).

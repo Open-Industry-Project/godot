@@ -129,6 +129,15 @@ public:
 	void get_transform_gizmo_data(Dictionary data);
 	void get_transform_commited();
 	void set_simulation_started(bool p_started);
+	void start_simulation();
+	void stop_simulation();
+	void toggle_pause_simulation();
+	bool is_simulation_running() const;
+	bool is_simulation_paused() const;
+
+	void _on_simulation_started();
+	void _on_simulation_stopped();
+	void _on_simulation_pause_toggled(bool p_paused);
 
 	void set_main_screen_editor(const String &p_name);
 	void set_distraction_free_mode(bool p_enter);
