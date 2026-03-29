@@ -651,6 +651,7 @@ void Node3DEditorViewport::cancel_transform() {
 	collision_reposition_warning_shown = false;
 	collision_reposition_normal_applied = false;
 	collision_reposition_alignment_axis = 1;
+	collision_reposition_angle = 0.0;
 	finish_transform();
 	set_message(TTRC("Transform Aborted."), 3);
 }
@@ -2080,8 +2081,34 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 	}
 
 	if (get_viewport()->gui_get_drag_data()) {
-		// Disable all input actions during drag-and-drop.
+		// Allow scroll wheel to rotate the preview node during drag-and-drop.
+		if (preview_node->is_inside_tree()) {
+			Ref<InputEventMouseButton> mb = p_event;
+			if (mb.is_valid() && mb->is_pressed()) {
+				if (mb->get_button_index() == MouseButton::WHEEL_UP) {
+					preview_node_angle += Math::deg_to_rad(spatial_editor->get_rotate_snap());
+					update_preview_node = true;
+				} else if (mb->get_button_index() == MouseButton::WHEEL_DOWN) {
+					preview_node_angle -= Math::deg_to_rad(spatial_editor->get_rotate_snap());
+					update_preview_node = true;
+				}
+			}
+		}
 		return;
+	}
+
+	// Allow scroll wheel to rotate during collision repositioning and block scroll zoom.
+	if (collision_reposition) {
+		Ref<InputEventMouseButton> mb = p_event;
+		if (mb.is_valid() && mb->is_pressed()) {
+			if (mb->get_button_index() == MouseButton::WHEEL_UP) {
+				collision_reposition_angle += Math::deg_to_rad(spatial_editor->get_rotate_snap());
+				return;
+			} else if (mb->get_button_index() == MouseButton::WHEEL_DOWN) {
+				collision_reposition_angle -= Math::deg_to_rad(spatial_editor->get_rotate_snap());
+				return;
+			}
+		}
 	}
 
 	if (k.is_valid()) {
@@ -2248,8 +2275,12 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 	}
 
 	// Several parts of the 3D navigation are handled here.
+	// Disable viewport navigation during collision repositioning to prevent
+	// scroll zoom and middle-mouse navigation from interfering.
 	bool was_navigating = view_3d_controller->is_navigating();
-	view_3d_controller->gui_input(p_event, surface->get_global_rect());
+	if (!collision_reposition) {
+		view_3d_controller->gui_input(p_event, surface->get_global_rect());
+	}
 	if (was_navigating && !view_3d_controller->is_navigating()) {
 		return;
 	}
@@ -3959,11 +3990,23 @@ void Node3DEditorViewport::_notification(int p_what) {
 								}
 
 								if (!alt_pressed && collision_reposition_normal_applied) {
-									Transform3D transform = active_node->get_global_transform();
-									transform.basis = collision_reposition_original_transform.basis;
-									active_node->set_global_transform(transform);
 									collision_reposition_normal_applied = false;
 									collision_reposition_alignment_axis = 1;
+								}
+
+								// Reset basis to original and apply scroll-to-rotate angle to prevent compounding.
+								{
+									Transform3D transform = active_node->get_global_transform();
+									if (!surface_aligned) {
+										Node3DEditorSelectedItem *se_active = editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(active_node);
+										if (se_active) {
+											transform.basis = se_active->original.basis;
+										}
+									}
+									if (collision_reposition_angle != 0.0) {
+										transform.basis.rotate(Vector3(0, 1, 0), collision_reposition_angle);
+									}
+									active_node->set_global_transform(transform);
 								}
 
 								Transform3D active_node_new_transform = active_node->get_global_transform();
@@ -4074,11 +4117,23 @@ void Node3DEditorViewport::_notification(int p_what) {
 					}
 
 					if (!alt_pressed && collision_reposition_normal_applied) {
-						Transform3D transform = selected_node->get_global_transform();
-						transform.basis = collision_reposition_original_transform.basis;
-						selected_node->set_global_transform(transform);
 						collision_reposition_normal_applied = false;
 						collision_reposition_alignment_axis = 1;
+					}
+
+					// Reset basis to original and apply scroll-to-rotate angle to prevent compounding.
+					{
+						Transform3D transform = selected_node->get_global_transform();
+						if (!surface_aligned) {
+							Node3DEditorSelectedItem *se_selected = editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(selected_node);
+							if (se_selected) {
+								transform.basis = se_selected->original.basis;
+							}
+						}
+						if (collision_reposition_angle != 0.0) {
+							transform.basis.rotate(Vector3(0, 1, 0), collision_reposition_angle);
+						}
+						selected_node->set_global_transform(transform);
 					}
 
 					if (collision_result.has_collision) {
@@ -4120,7 +4175,9 @@ void Node3DEditorViewport::_notification(int p_what) {
 				double snap = EDITOR_GET("interface/inspector/default_float_step");
 				int snap_step_decimals = Math::range_step_decimals(snap);
 				set_message(vformat(TTR("Instantiating: %s"), vformat("%.*v", snap_step_decimals, preview_node_pos)));
-				Transform3D preview_gl_transform = Transform3D(Basis(), preview_node_pos);
+				Basis preview_basis;
+				preview_basis.rotate(Vector3(0, 1, 0), preview_node_angle);
+				Transform3D preview_gl_transform = Transform3D(preview_basis, preview_node_pos);
 				preview_node->set_global_transform(preview_gl_transform);
 				if (!preview_node->is_visible()) {
 					preview_node->show();
@@ -6163,12 +6220,16 @@ bool Node3DEditorViewport::_create_instance(Node *p_parent, const String &p_path
 			parent_tf = parent_node3d->get_global_gizmo_transform();
 		}
 
+		Basis preview_rotation;
+		preview_rotation.rotate(Vector3(0, 1, 0), preview_node_angle);
+
 		Transform3D new_tf = node3d->get_transform();
 		if (node3d->is_set_as_top_level()) {
 			new_tf.origin += preview_node_pos;
+			new_tf.basis = preview_rotation * new_tf.basis;
 		} else {
 			new_tf.origin = parent_tf.affine_inverse().xform(preview_node_pos + node3d->get_position());
-			new_tf.basis = parent_tf.affine_inverse().basis * new_tf.basis;
+			new_tf.basis = parent_tf.affine_inverse().basis * preview_rotation * new_tf.basis;
 		}
 
 		undo_redo->add_do_method(instantiated_scene, "set_transform", new_tf);
@@ -6269,6 +6330,7 @@ void Node3DEditorViewport::_perform_drop_data() {
 	}
 
 	undo_redo->commit_action();
+	preview_node_angle = 0.0;
 
 	if (error_files.size() > 0) {
 		accept->set_text(vformat(TTR("Error instantiating scene from %s."), String(", ").join(error_files)));
@@ -6582,6 +6644,7 @@ void Node3DEditorViewport::commit_transform() {
 	collision_reposition_warning_shown = false;
 	collision_reposition_normal_applied = false;
 	collision_reposition_alignment_axis = 1;
+	collision_reposition_angle = 0.0;
 	finish_transform();
 	_reset_follow_mode_count();
 	set_message("");

@@ -220,6 +220,7 @@ private:
 	bool update_preview_node = false;
 	Point2 preview_node_viewport_pos;
 	Vector3 preview_node_pos;
+	real_t preview_node_angle = 0.0;
 	AABB *preview_bounds = nullptr;
 	Vector<String> selected_files;
 	AcceptDialog *accept = nullptr;
@@ -252,6 +253,7 @@ private:
 	int collision_reposition_alignment_axis = 1; // 0=X, 1=Y, 2=Z, 3=-X, 4=-Y, 5=-Z
 	Vector3 collision_reposition_last_point;
 	Vector3 collision_reposition_last_normal;
+	real_t collision_reposition_angle = 0.0;
 	AABB cached_collision_reposition_bounds;
 	HashMap<Node3D *, Variant> collision_reposition_undo_data;
 	real_t gizmo_scale;
