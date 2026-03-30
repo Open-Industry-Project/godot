@@ -48,6 +48,12 @@ private:
 
 	Ref<PhysicsMaterial> physics_material_override;
 
+	void _push_ghost_settings();
+
+	bool ghost_collision_filtering_enabled = false;
+	real_t ghost_collision_threshold_angle = Math::deg_to_rad(45.0);
+	real_t ghost_collision_depth_threshold = 0.002; // 2mm
+
 protected:
 	static void _bind_methods();
 
@@ -60,6 +66,15 @@ public:
 
 	Vector3 get_constant_linear_velocity() const;
 	Vector3 get_constant_angular_velocity() const;
+
+	void set_ghost_collision_filtering_enabled(bool p_enabled);
+	bool is_ghost_collision_filtering_enabled() const;
+
+	void set_ghost_collision_threshold_angle(real_t p_angle_radians);
+	real_t get_ghost_collision_threshold_angle() const;
+
+	void set_ghost_collision_depth_threshold(real_t p_depth);
+	real_t get_ghost_collision_depth_threshold() const;
 
 	StaticBody3D(PhysicsServer3D::BodyMode p_mode = PhysicsServer3D::BODY_MODE_STATIC);
 

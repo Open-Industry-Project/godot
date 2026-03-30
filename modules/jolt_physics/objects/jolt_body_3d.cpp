@@ -659,10 +659,17 @@ void JoltBody3D::set_param(PhysicsServer3D::BodyParameter p_param, const Variant
 			set_angular_damp(p_value);
 		} break;
 		case PhysicsServer3D::BODY_PARAM_MAX: {
-			ERR_FAIL_COND(p_value.get_type() != Variant::VECTOR2);
-			Vector2 ghost_settings = p_value;
-			set_ghost_collision_filtering_enabled(ghost_settings.x > 0.5f);
-			set_ghost_collision_threshold_angle(ghost_settings.y);
+			ERR_FAIL_COND(p_value.get_type() != Variant::VECTOR2 && p_value.get_type() != Variant::VECTOR3);
+			if (p_value.get_type() == Variant::VECTOR3) {
+				Vector3 ghost_settings = p_value;
+				set_ghost_collision_filtering_enabled(ghost_settings.x > 0.5f);
+				set_ghost_collision_threshold_angle(ghost_settings.y);
+				set_ghost_collision_depth_threshold(ghost_settings.z);
+			} else {
+				Vector2 ghost_settings = p_value;
+				set_ghost_collision_filtering_enabled(ghost_settings.x > 0.5f);
+				set_ghost_collision_threshold_angle(ghost_settings.y);
+			}
 		} break;
 		default: {
 			ERR_FAIL_MSG(vformat("Unhandled body parameter: '%d'. This should not happen. Please report this.", p_param));

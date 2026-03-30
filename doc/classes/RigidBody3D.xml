@@ -180,9 +180,14 @@
 			The body's freeze mode. Determines the body's behavior when [member freeze] is [code]true[/code].
 			[b]Note:[/b] For a body that is always frozen, use [StaticBody3D] or [AnimatableBody3D] instead.
 		</member>
+		<member name="ghost_collision_depth_threshold" type="float" setter="set_ghost_collision_depth_threshold" getter="get_ghost_collision_depth_threshold" default="0.002">
+			The maximum penetration depth (in meters) for a contact to be considered shallow enough to filter as a ghost collision. Contacts deeper than this value are always kept. Only used when [member ghost_collision_filtering_enabled] is [code]true[/code].
+		</member>
 		<member name="ghost_collision_filtering_enabled" type="bool" setter="set_ghost_collision_filtering_enabled" getter="is_ghost_collision_filtering_enabled" default="false">
+			If [code]true[/code], enables ghost collision filtering. Shallow contacts against static or kinematic bodies are filtered based on [member ghost_collision_threshold_angle] and [member ghost_collision_depth_threshold] to prevent false collisions when bodies graze surfaces at shallow angles.
 		</member>
 		<member name="ghost_collision_threshold_angle" type="float" setter="set_ghost_collision_threshold_angle" getter="get_ghost_collision_threshold_angle" default="0.7853982">
+			The angle threshold (in radians) used to determine ghost collisions. Shallow contacts whose normal aligns with the up direction beyond this angle are filtered out. Only used when [member ghost_collision_filtering_enabled] is [code]true[/code]. Defaults to 45 degrees.
 		</member>
 		<member name="gravity_scale" type="float" setter="set_gravity_scale" getter="get_gravity_scale" default="1.0">
 			This is multiplied by [member ProjectSettings.physics/3d/default_gravity] to produce this body's gravity. For example, a value of [code]1.0[/code] will apply normal gravity, [code]2.0[/code] will apply double the gravity, and [code]0.5[/code] will apply half the gravity to this body.

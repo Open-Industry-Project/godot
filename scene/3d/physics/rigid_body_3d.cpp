@@ -678,11 +678,15 @@ PackedStringArray RigidBody3D::get_configuration_warnings() const {
 	return warnings;
 }
 
+void RigidBody3D::_push_ghost_settings() {
+	real_t angle_degrees = Math::rad_to_deg(ghost_collision_threshold_angle);
+	Vector3 ghost_settings(ghost_collision_filtering_enabled ? 1.0f : 0.0f, angle_degrees, ghost_collision_depth_threshold);
+	PhysicsServer3D::get_singleton()->body_set_param(get_rid(), PhysicsServer3D::BODY_PARAM_MAX, ghost_settings);
+}
+
 void RigidBody3D::set_ghost_collision_filtering_enabled(bool p_enabled) {
 	ghost_collision_filtering_enabled = p_enabled;
-	real_t angle_degrees = Math::rad_to_deg(ghost_collision_threshold_angle);
-	Vector2 ghost_settings(p_enabled ? 1.0f : 0.0f, angle_degrees);
-	PhysicsServer3D::get_singleton()->body_set_param(get_rid(), PhysicsServer3D::BODY_PARAM_MAX, ghost_settings);
+	_push_ghost_settings();
 }
 
 bool RigidBody3D::is_ghost_collision_filtering_enabled() const {
@@ -691,13 +695,20 @@ bool RigidBody3D::is_ghost_collision_filtering_enabled() const {
 
 void RigidBody3D::set_ghost_collision_threshold_angle(real_t p_angle_radians) {
 	ghost_collision_threshold_angle = CLAMP(p_angle_radians, 0.0, Math::deg_to_rad(90.0));
-	real_t angle_degrees = Math::rad_to_deg(ghost_collision_threshold_angle);
-	Vector2 ghost_settings(ghost_collision_filtering_enabled ? 1.0f : 0.0f, angle_degrees);
-	PhysicsServer3D::get_singleton()->body_set_param(get_rid(), PhysicsServer3D::BODY_PARAM_MAX, ghost_settings);
+	_push_ghost_settings();
 }
 
 real_t RigidBody3D::get_ghost_collision_threshold_angle() const {
 	return ghost_collision_threshold_angle;
+}
+
+void RigidBody3D::set_ghost_collision_depth_threshold(real_t p_depth) {
+	ghost_collision_depth_threshold = MAX(0.0, p_depth);
+	_push_ghost_settings();
+}
+
+real_t RigidBody3D::get_ghost_collision_depth_threshold() const {
+	return ghost_collision_depth_threshold;
 }
 
 void RigidBody3D::_bind_methods() {
@@ -793,6 +804,8 @@ void RigidBody3D::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("is_ghost_collision_filtering_enabled"), &RigidBody3D::is_ghost_collision_filtering_enabled);
 	ClassDB::bind_method(D_METHOD("set_ghost_collision_threshold_angle", "angle"), &RigidBody3D::set_ghost_collision_threshold_angle);
 	ClassDB::bind_method(D_METHOD("get_ghost_collision_threshold_angle"), &RigidBody3D::get_ghost_collision_threshold_angle);
+	ClassDB::bind_method(D_METHOD("set_ghost_collision_depth_threshold", "depth"), &RigidBody3D::set_ghost_collision_depth_threshold);
+	ClassDB::bind_method(D_METHOD("get_ghost_collision_depth_threshold"), &RigidBody3D::get_ghost_collision_depth_threshold);
 
 	GDVIRTUAL_BIND(_integrate_forces, "state");
 
@@ -818,6 +831,7 @@ void RigidBody3D::_bind_methods() {
 	ADD_GROUP("Ghost Collision Filtering", "ghost_collision_");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "ghost_collision_filtering_enabled"), "set_ghost_collision_filtering_enabled", "is_ghost_collision_filtering_enabled");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ghost_collision_threshold_angle", PROPERTY_HINT_RANGE, "0,90,0.1,radians_as_degrees"), "set_ghost_collision_threshold_angle", "get_ghost_collision_threshold_angle");
+	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "ghost_collision_depth_threshold", PROPERTY_HINT_RANGE, "0,0.1,0.0001,suffix:m"), "set_ghost_collision_depth_threshold", "get_ghost_collision_depth_threshold");
 
 	ADD_GROUP("Linear", "linear_");
 	ADD_PROPERTY(PropertyInfo(Variant::VECTOR3, "linear_velocity", PROPERTY_HINT_NONE, "suffix:m/s"), "set_linear_velocity", "get_linear_velocity");
