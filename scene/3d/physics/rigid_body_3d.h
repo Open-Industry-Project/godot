@@ -87,7 +87,10 @@ private:
 	bool custom_integrator = false;
 
 	bool ghost_collision_filtering_enabled = false;
-	real_t ghost_collision_threshold_angle = Math::deg_to_rad(45.0); // radians (displayed as degrees)
+	real_t ghost_collision_threshold_angle = Math::deg_to_rad(45.0);
+	real_t ghost_collision_depth_threshold = 0.002; // 2mm
+
+	void _push_ghost_settings();
 
 	struct ShapePair {
 		int body_shape = 0;
@@ -242,6 +245,9 @@ public:
 
 	void set_ghost_collision_threshold_angle(real_t p_angle);
 	real_t get_ghost_collision_threshold_angle() const;
+
+	void set_ghost_collision_depth_threshold(real_t p_depth);
+	real_t get_ghost_collision_depth_threshold() const;
 
 	virtual PackedStringArray get_configuration_warnings() const override;
 

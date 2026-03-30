@@ -104,7 +104,8 @@ private:
 	bool custom_integrator = false;
 	bool has_point_gravity = false;
 	bool ghost_collision_filtering_enabled = false;
-	float ghost_collision_threshold_angle = 45.0f; // Angle threshold in degrees for ghost collision filtering (0-90°)
+	float ghost_collision_threshold_angle = 45.0f;
+	float ghost_collision_depth_threshold = 0.002f; // 2mm
 
 	virtual JPH::BroadPhaseLayer _get_broad_phase_layer() const override;
 	virtual JPH::ObjectLayer _get_object_layer() const override;
@@ -310,6 +311,9 @@ public:
 
 	float get_ghost_collision_threshold_angle() const { return ghost_collision_threshold_angle; }
 	void set_ghost_collision_threshold_angle(float p_angle) { ghost_collision_threshold_angle = p_angle; }
+
+	float get_ghost_collision_depth_threshold() const { return ghost_collision_depth_threshold; }
+	void set_ghost_collision_depth_threshold(float p_depth) { ghost_collision_depth_threshold = p_depth; }
 
 	virtual bool can_interact_with(const JoltBody3D &p_other) const override;
 	virtual bool can_interact_with(const JoltSoftBody3D &p_other) const override;

@@ -573,12 +573,12 @@ void JoltContactListener3D::_clear_area_soft_body_overlaps() {
 }
 
 bool JoltContactListener3D::_is_conveyor_ghost_collision(const JPH::Body &p_body1, const JPH::Body &p_body2, const JPH::ContactManifold &p_manifold) {
-	// Skip if either body is a sensor
+	// Skip if either body is a sensor.
 	if (p_body1.IsSensor() || p_body2.IsSensor()) {
 		return false;
 	}
 
-	// Only check when one body is dynamic and the other is static
+	// Only check when one body is dynamic and the other is static/kinematic.
 	const bool is_dynamic1 = p_body1.IsDynamic();
 	const bool is_dynamic2 = p_body2.IsDynamic();
 
@@ -586,7 +586,6 @@ bool JoltContactListener3D::_is_conveyor_ghost_collision(const JPH::Body &p_body
 		return false;
 	}
 
-	// Get the bodies
 	const JoltBody3D *body1 = reinterpret_cast<JoltBody3D *>(p_body1.GetUserData());
 	const JoltBody3D *body2 = reinterpret_cast<JoltBody3D *>(p_body2.GetUserData());
 
@@ -594,26 +593,38 @@ bool JoltContactListener3D::_is_conveyor_ghost_collision(const JPH::Body &p_body
 		return false;
 	}
 
-	// Identify which body is static (potential conveyor) and which is dynamic
 	const JoltBody3D *static_body = is_dynamic1 ? body2 : body1;
 	const JoltBody3D *dynamic_body = is_dynamic1 ? body1 : body2;
 
-	if (!dynamic_body->is_ghost_collision_filtering_enabled()) {
+	// Check if either body has ghost collision filtering enabled.
+	const bool dynamic_filtering = dynamic_body->is_ghost_collision_filtering_enabled();
+	const bool static_filtering = static_body->is_ghost_collision_filtering_enabled();
+
+	if (!dynamic_filtering && !static_filtering) {
 		return false;
 	}
 
-	const Vector3 linear_surface_velocity = static_body->get_linear_surface_velocity();
-	const Vector3 angular_surface_velocity = static_body->get_angular_surface_velocity();
+	// Use the most permissive threshold from either body.
+	float threshold_angle = 0.0f;
+	float depth_threshold = 0.0f;
 
-	if (linear_surface_velocity.length_squared() < 0.001f && angular_surface_velocity.length_squared() < 0.001f) {
+	if (dynamic_filtering) {
+		threshold_angle = dynamic_body->get_ghost_collision_threshold_angle();
+		depth_threshold = dynamic_body->get_ghost_collision_depth_threshold();
+	}
+	if (static_filtering) {
+		threshold_angle = MAX(threshold_angle, static_body->get_ghost_collision_threshold_angle());
+		depth_threshold = MAX(depth_threshold, static_body->get_ghost_collision_depth_threshold());
+	}
+
+	// Ghost collisions are shallow — real wall hits have deeper penetration.
+	if (p_manifold.mPenetrationDepth > depth_threshold) {
 		return false;
 	}
 
-	// Check contact normal direction - filter sideways collisions, keep top surface contacts
+	// Keep top-surface contacts (normal pointing up relative to the dynamic body).
 	const JPH::Vec3 world_normal = p_manifold.mWorldSpaceNormal;
 	const float up_dot = is_dynamic1 ? -world_normal.GetY() : world_normal.GetY();
-
-	const float threshold_angle = dynamic_body->get_ghost_collision_threshold_angle();
 	const float threshold_dot = cos(Math::deg_to_rad(threshold_angle));
 
 	if (up_dot > threshold_dot) {

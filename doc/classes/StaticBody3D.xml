@@ -22,6 +22,15 @@
 		<member name="constant_linear_velocity" type="Vector3" setter="set_constant_linear_velocity" getter="get_constant_linear_velocity" default="Vector3(0, 0, 0)">
 			The body's constant linear velocity. This does not move the body, but affects touching bodies, as if it were moving.
 		</member>
+		<member name="ghost_collision_depth_threshold" type="float" setter="set_ghost_collision_depth_threshold" getter="get_ghost_collision_depth_threshold" default="0.002">
+			The maximum penetration depth (in meters) for a contact to be considered shallow enough to filter as a ghost collision. Contacts deeper than this value are always kept. Only used when [member ghost_collision_filtering_enabled] is [code]true[/code].
+		</member>
+		<member name="ghost_collision_filtering_enabled" type="bool" setter="set_ghost_collision_filtering_enabled" getter="is_ghost_collision_filtering_enabled" default="false">
+			If [code]true[/code], enables ghost collision filtering for dynamic bodies contacting this static body. Shallow contacts are filtered based on [member ghost_collision_threshold_angle] and [member ghost_collision_depth_threshold] to prevent false collisions when bodies graze this surface at shallow angles.
+		</member>
+		<member name="ghost_collision_threshold_angle" type="float" setter="set_ghost_collision_threshold_angle" getter="get_ghost_collision_threshold_angle" default="0.7853982">
+			The angle threshold (in radians) used to determine ghost collisions. Shallow contacts whose normal aligns with the up direction beyond this angle are filtered out. Only used when [member ghost_collision_filtering_enabled] is [code]true[/code]. Defaults to 45 degrees.
+		</member>
 		<member name="physics_material_override" type="PhysicsMaterial" setter="set_physics_material_override" getter="get_physics_material_override">
 			The physics material override for the body.
 			If a material is assigned to this property, it will be used instead of any other physics material, such as an inherited one.
