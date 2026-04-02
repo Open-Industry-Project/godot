@@ -3103,7 +3103,7 @@ void Node3DEditorViewport::_sinput(const Ref<InputEvent> &p_event) {
 							bounds_node = spatial_editor->get_active_node();
 						}
 						if (bounds_node) {
-							cached_collision_reposition_bounds = _calculate_spatial_bounds(bounds_node, true);
+							cached_collision_reposition_bounds = _calculate_spatial_bounds(bounds_node, false);
 						}
 
 						collision_reposition_undo_data.clear();
@@ -5839,7 +5839,7 @@ Node3DEditorViewport::CollisionResult Node3DEditorViewport::_get_instance_positi
 					center += sp->get_global_position();
 					valid_nodes++;
 
-					AABB node_aabb = _calculate_spatial_bounds(sp, true);
+					AABB node_aabb = _calculate_spatial_bounds(sp, !collision_reposition);
 					Transform3D node_xform = sp->get_global_transform();
 					node_aabb = node_xform.xform(node_aabb);
 
