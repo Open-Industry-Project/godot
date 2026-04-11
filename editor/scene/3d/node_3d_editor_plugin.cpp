@@ -6709,6 +6709,13 @@ void Node3DEditorViewport::apply_transform(Vector3 p_motion, double p_snap) {
 			}
 		} else {
 			Transform3D new_xform = _compute_transform(_edit.mode, se->original, se->original_local, p_motion, p_snap, local_coords, sp->get_rotation_edit_mode() != Node3D::ROTATION_EDIT_MODE_BASIS && _edit.plane != TRANSFORM_VIEW, is_global_view_plane);
+			if (sp->has_meta("_snap_transform")) {
+				Callable snap_fn = sp->get_meta("_snap_transform");
+				Variant result = snap_fn.call(new_xform);
+				if (result.get_type() == Variant::TRANSFORM3D) {
+					new_xform = result;
+				}
+			}
 			_transform_gizmo_apply(se->sp, new_xform, local_coords);
 		}
 	}
