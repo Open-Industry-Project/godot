@@ -3956,7 +3956,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 
 								active_node->set_global_position(collision_pos);
 
-								if (alt_pressed && collision_result.has_collision) {
+								if (alt_pressed && collision_result.has_collision && !active_node->has_meta("_snap_transform")) {
 									if (!collision_reposition_normal_applied) {
 										collision_reposition_original_transform = active_node->get_global_transform();
 										collision_reposition_normal_applied = true;
@@ -4032,6 +4032,21 @@ void Node3DEditorViewport::_notification(int p_what) {
 									}
 								}
 
+								if (active_node->has_meta("_snap_transform")) {
+									Callable snap_fn = active_node->get_meta("_snap_transform");
+									Variant snap_result = snap_fn.call(active_node->get_global_transform());
+									if (snap_result.get_type() == Variant::TRANSFORM3D) {
+										Transform3D snapped = snap_result;
+										active_node->set_global_transform(snapped);
+										for (Node *E : selection) {
+											Node3D *sp = Object::cast_to<Node3D>(E);
+											if (sp && sp != active_node && relative_transforms.has(sp)) {
+												sp->set_global_transform(snapped * relative_transforms[sp]);
+											}
+										}
+									}
+								}
+
 								if (!ruler->is_inside_tree()) {
 									double snap = EDITOR_GET("interface/inspector/default_float_step");
 									int snap_step_decimals = Math::range_step_decimals(snap);
@@ -4057,7 +4072,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 					bool surface_aligned = false;
 
 					if (collision_result.has_collision) {
-						if (alt_pressed) {
+						if (alt_pressed && !selected_node->has_meta("_snap_transform")) {
 							if (!collision_reposition_normal_applied) {
 								collision_reposition_original_transform = selected_node->get_global_transform();
 								collision_reposition_normal_applied = true;
@@ -4144,6 +4159,14 @@ void Node3DEditorViewport::_notification(int p_what) {
 						}
 					}
 
+					if (selected_node->has_meta("_snap_transform")) {
+						Callable snap_fn = selected_node->get_meta("_snap_transform");
+						Variant snap_result = snap_fn.call(selected_node->get_global_transform());
+						if (snap_result.get_type() == Variant::TRANSFORM3D) {
+							selected_node->set_global_transform(snap_result);
+						}
+					}
+
 					if (!ruler->is_inside_tree()) {
 						double snap = EDITOR_GET("interface/inspector/default_float_step");
 						int snap_step_decimals = Math::range_step_decimals(snap);
@@ -4179,6 +4202,22 @@ void Node3DEditorViewport::_notification(int p_what) {
 				preview_basis.rotate(Vector3(0, 1, 0), preview_node_angle);
 				Transform3D preview_gl_transform = Transform3D(preview_basis, preview_node_pos);
 				preview_node->set_global_transform(preview_gl_transform);
+				for (int i = 0; i < preview_node->get_child_count(); i++) {
+					Node3D *child = Object::cast_to<Node3D>(preview_node->get_child(i));
+					if (child && child->has_meta("_snap_transform")) {
+						Callable snap_fn = child->get_meta("_snap_transform");
+						Variant snap_result = snap_fn.call(preview_node->get_global_transform());
+						if (snap_result.get_type() == Variant::TRANSFORM3D) {
+							Transform3D snapped = snap_result;
+							Basis snap_rot = snapped.basis.orthonormalized();
+							Basis child_local_rot = child->get_transform().basis.orthonormalized();
+							Basis compensated = snap_rot * child_local_rot.transposed();
+							preview_node->set_global_transform(Transform3D(compensated, snapped.origin));
+							preview_node_pos = snapped.origin;
+						}
+						break;
+					}
+				}
 				if (!preview_node->is_visible()) {
 					preview_node->show();
 				}
@@ -6220,16 +6259,13 @@ bool Node3DEditorViewport::_create_instance(Node *p_parent, const String &p_path
 			parent_tf = parent_node3d->get_global_gizmo_transform();
 		}
 
-		Basis preview_rotation;
-		preview_rotation.rotate(Vector3(0, 1, 0), preview_node_angle);
-
 		Transform3D new_tf = node3d->get_transform();
 		if (node3d->is_set_as_top_level()) {
 			new_tf.origin += preview_node_pos;
-			new_tf.basis = preview_rotation * new_tf.basis;
+			new_tf.basis = preview_node_basis * new_tf.basis;
 		} else {
 			new_tf.origin = parent_tf.affine_inverse().xform(preview_node_pos + node3d->get_position());
-			new_tf.basis = parent_tf.affine_inverse().basis * preview_rotation * new_tf.basis;
+			new_tf.basis = parent_tf.affine_inverse().basis * preview_node_basis * new_tf.basis;
 		}
 
 		undo_redo->add_do_method(instantiated_scene, "set_transform", new_tf);
@@ -6297,6 +6333,13 @@ void Node3DEditorViewport::_perform_drop_data() {
 
 		_remove_preview_material();
 		return;
+	}
+
+	if (preview_node && preview_node->is_inside_tree()) {
+		preview_node_basis = preview_node->get_global_transform().basis;
+	} else {
+		preview_node_basis = Basis();
+		preview_node_basis.rotate(Vector3(0, 1, 0), preview_node_angle);
 	}
 
 	_remove_preview_node();
