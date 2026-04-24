@@ -221,6 +221,7 @@ private:
 	Point2 preview_node_viewport_pos;
 	Vector3 preview_node_pos;
 	real_t preview_node_angle = 0.0;
+	Basis preview_node_basis;
 	AABB *preview_bounds = nullptr;
 	Vector<String> selected_files;
 	AcceptDialog *accept = nullptr;
