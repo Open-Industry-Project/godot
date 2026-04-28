@@ -4194,14 +4194,17 @@ void Node3DEditorViewport::_notification(int p_what) {
 				return;
 			}
 			if (preview_node->is_inside_tree()) {
-				preview_node_pos = spatial_editor->snap_point(_get_instance_position(preview_node_viewport_pos, preview_node));
-				double snap = EDITOR_GET("interface/inspector/default_float_step");
-				int snap_step_decimals = Math::range_step_decimals(snap);
-				set_message(vformat(TTR("Instantiating: %s"), vformat("%.*v", snap_step_decimals, preview_node_pos)));
 				Basis preview_basis;
 				preview_basis.rotate(Vector3(0, 1, 0), preview_node_angle);
-				Transform3D preview_gl_transform = Transform3D(preview_basis, preview_node_pos);
-				preview_node->set_global_transform(preview_gl_transform);
+
+				CollisionResult cr = _get_instance_position_and_normal(preview_node_viewport_pos, preview_node);
+				Vector3 surface_pos = spatial_editor->snap_point(cr.has_collision ? cr.surface_point : cr.position);
+				Vector3 offset_pos = spatial_editor->snap_point(cr.position);
+
+				preview_node_pos = surface_pos;
+				preview_node->set_global_transform(Transform3D(preview_basis, preview_node_pos));
+
+				bool snap_engaged = false;
 				for (int i = 0; i < preview_node->get_child_count(); i++) {
 					Node3D *child = Object::cast_to<Node3D>(preview_node->get_child(i));
 					if (child && child->has_meta("_snap_transform")) {
@@ -4214,10 +4217,21 @@ void Node3DEditorViewport::_notification(int p_what) {
 							Basis compensated = snap_rot * child_local_rot.transposed();
 							preview_node->set_global_transform(Transform3D(compensated, snapped.origin));
 							preview_node_pos = snapped.origin;
+							snap_engaged = true;
 						}
 						break;
 					}
 				}
+
+				if (!snap_engaged) {
+					preview_node_pos = offset_pos;
+					preview_node->set_global_transform(Transform3D(preview_basis, preview_node_pos));
+				}
+
+				double snap = EDITOR_GET("interface/inspector/default_float_step");
+				int snap_step_decimals = Math::range_step_decimals(snap);
+				set_message(vformat(TTR("Instantiating: %s"), vformat("%.*v", snap_step_decimals, preview_node_pos)));
+
 				if (!preview_node->is_visible()) {
 					preview_node->show();
 				}
