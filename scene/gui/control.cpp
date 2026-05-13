@@ -715,19 +715,7 @@ Rect2 Control::get_parent_anchorable_rect() const {
 	if (data.parent_canvas_item) {
 		parent_rect = data.parent_canvas_item->get_anchorable_rect();
 	} else {
-#ifdef TOOLS_ENABLED
-		Node *edited_scene_root = get_tree()->get_edited_scene_root();
-		Node *scene_root_parent = edited_scene_root ? edited_scene_root->get_parent() : nullptr;
-
-		if (scene_root_parent && get_viewport() == scene_root_parent->get_viewport()) {
-			parent_rect.size = Size2(GLOBAL_GET_CACHED(real_t, "display/window/size/viewport_width"), GLOBAL_GET_CACHED(real_t, "display/window/size/viewport_height"));
-		} else {
-			parent_rect = get_viewport()->get_visible_rect();
-		}
-
-#else
 		parent_rect = get_viewport()->get_visible_rect();
-#endif // TOOLS_ENABLED
 	}
 
 	return parent_rect;

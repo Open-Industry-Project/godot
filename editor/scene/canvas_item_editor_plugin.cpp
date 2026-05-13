@@ -62,13 +62,14 @@
 #include "scene/2d/skeleton_2d.h"
 #include "scene/2d/sprite_2d.h"
 #include "scene/gui/base_button.h"
+#include "scene/gui/color_rect.h"
 #include "scene/gui/flow_container.h"
 #include "scene/gui/grid_container.h"
 #include "scene/gui/rich_text_label.h"
 #include "scene/gui/separator.h"
 #include "scene/gui/split_container.h"
-#include "scene/gui/subviewport_container.h"
 #include "scene/gui/texture_button.h"
+#include "scene/gui/texture_rect.h"
 #include "scene/gui/view_panner.h"
 #include "scene/main/canvas_layer.h"
 #include "scene/main/scene_tree.h"
@@ -4266,11 +4267,28 @@ void CanvasItemEditor::_draw_locks_and_groups(Node *p_node, const Transform2D &p
 }
 
 void CanvasItemEditor::_draw_viewport() {
-	// Update the transform
+	// canvas_xform drives scene_root rendering; `transform` maps canvas coords to pane pixels
+	// for gizmos and input. The letterbox offset is folded into `transform` so gizmos align
+	// with the displayed framebuffer.
+	SubViewport *scene_root = EditorNode::get_singleton()->get_scene_root();
+	const Size2 scene_size = scene_root->get_size();
+	const Size2 pane_size = viewport->get_size();
+	real_t display_scale = 1.0;
+	Vector2 display_offset;
+	if (scene_size.x > 0 && scene_size.y > 0 && pane_size.x > 0 && pane_size.y > 0) {
+		display_scale = MIN(pane_size.x / scene_size.x, pane_size.y / scene_size.y);
+		display_offset = (pane_size - scene_size * display_scale) * 0.5;
+	}
+
+	const real_t canvas_zoom = zoom / display_scale;
+	Transform2D canvas_xform;
+	canvas_xform.scale_basis(Size2(canvas_zoom, canvas_zoom));
+	canvas_xform.columns[2] = -view_offset * canvas_zoom;
+	scene_root->set_global_canvas_transform(canvas_xform);
+
 	transform = Transform2D();
 	transform.scale_basis(Size2(zoom, zoom));
-	transform.columns[2] = -view_offset * zoom;
-	EditorNode::get_singleton()->get_scene_root()->set_global_canvas_transform(transform);
+	transform.columns[2] = -view_offset * zoom + display_offset;
 
 	_draw_grid();
 	_draw_ruler_tool();
@@ -4388,6 +4406,14 @@ void CanvasItemEditor::_notification(int p_what) {
 			_update_lock_and_group_button();
 
 			ProjectSettings::get_singleton()->connect("settings_changed", callable_mp(this, &CanvasItemEditor::_project_settings_changed));
+		} break;
+
+		case NOTIFICATION_VISIBILITY_CHANGED: {
+			if (!is_visible_in_tree()) {
+				EditorNode::get_singleton()->get_scene_root()->set_global_canvas_transform(Transform2D());
+			} else {
+				update_viewport();
+			}
 		} break;
 
 		case NOTIFICATION_PROCESS: {
@@ -4660,7 +4686,18 @@ void CanvasItemEditor::_update_zoom(real_t p_zoom) {
 }
 
 void CanvasItemEditor::_update_oversampling() {
-	EditorNode::get_singleton()->get_scene_root()->set_oversampling_override(auto_resampling_enabled ? zoom : 0.0);
+	SubViewport *scene_root = EditorNode::get_singleton()->get_scene_root();
+	if (!auto_resampling_enabled) {
+		scene_root->set_oversampling_override(0.0);
+		return;
+	}
+	const Size2 scene_size = scene_root->get_size();
+	const Size2 pane_size = viewport->get_size();
+	real_t display_scale = 1.0;
+	if (scene_size.x > 0 && scene_size.y > 0 && pane_size.x > 0 && pane_size.y > 0) {
+		display_scale = MIN(pane_size.x / scene_size.x, pane_size.y / scene_size.y);
+	}
+	scene_root->set_oversampling_override(zoom / display_scale);
 }
 
 void CanvasItemEditor::_shortcut_zoom_set(real_t p_zoom) {
@@ -5647,11 +5684,21 @@ CanvasItemEditor::CanvasItemEditor() {
 	viewport_scrollable->set_h_size_flags(Control::SIZE_EXPAND_FILL);
 	viewport_scrollable->connect(SceneStringName(draw), callable_mp(this, &CanvasItemEditor::_update_scrollbars));
 
-	SubViewportContainer *scene_tree = memnew(SubViewportContainer);
-	viewport_scrollable->add_child(scene_tree);
-	scene_tree->set_stretch(true);
-	scene_tree->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
-	scene_tree->add_child(EditorNode::get_singleton()->get_scene_root());
+	// scene_root is transparent; supply the clear color behind letterbox bars and transparent
+	// scene regions.
+	ColorRect *scene_bg = memnew(ColorRect);
+	viewport_scrollable->add_child(scene_bg);
+	scene_bg->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
+	scene_bg->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+	scene_bg->set_color(GLOBAL_GET("rendering/environment/defaults/default_clear_color"));
+
+	TextureRect *scene_view = memnew(TextureRect);
+	viewport_scrollable->add_child(scene_view);
+	scene_view->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
+	scene_view->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
+	scene_view->set_stretch_mode(TextureRect::STRETCH_KEEP_ASPECT_CENTERED);
+	scene_view->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+	scene_view->set_texture(EditorNode::get_singleton()->get_scene_root()->get_texture());
 
 	controls_vb = memnew(VBoxContainer);
 	controls_vb->set_begin(Point2(5, 5));
@@ -5724,6 +5771,7 @@ CanvasItemEditor::CanvasItemEditor() {
 	viewport->connect(SceneStringName(draw), callable_mp(this, &CanvasItemEditor::_draw_viewport));
 	viewport->connect(SceneStringName(gui_input), callable_mp(this, &CanvasItemEditor::_gui_input_viewport));
 	viewport->connect(SceneStringName(focus_exited), callable_mp(panner.ptr(), &ViewPanner::release_pan_key));
+	viewport->connect(SceneStringName(resized), callable_mp(this, &CanvasItemEditor::_update_oversampling));
 
 	h_scroll = memnew(HScrollBar);
 	viewport->add_child(h_scroll);
@@ -6136,14 +6184,9 @@ void CanvasItemEditorPlugin::make_visible(bool p_visible) {
 	if (p_visible) {
 		canvas_item_editor->show();
 		canvas_item_editor->set_process(true);
-		RenderingServer::get_singleton()->viewport_set_disable_2d(EditorNode::get_singleton()->get_scene_root()->get_viewport_rid(), false);
-		RenderingServer::get_singleton()->viewport_set_environment_mode(EditorNode::get_singleton()->get_scene_root()->get_viewport_rid(), RSE::VIEWPORT_ENVIRONMENT_ENABLED);
-
 	} else {
 		canvas_item_editor->hide();
 		canvas_item_editor->set_process(false);
-		RenderingServer::get_singleton()->viewport_set_disable_2d(EditorNode::get_singleton()->get_scene_root()->get_viewport_rid(), true);
-		RenderingServer::get_singleton()->viewport_set_environment_mode(EditorNode::get_singleton()->get_scene_root()->get_viewport_rid(), RSE::VIEWPORT_ENVIRONMENT_DISABLED);
 	}
 }
 

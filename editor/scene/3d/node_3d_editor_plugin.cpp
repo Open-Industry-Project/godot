@@ -109,11 +109,13 @@
 #include "scene/gui/separator.h"
 #include "scene/gui/split_container.h"
 #include "scene/gui/subviewport_container.h"
+#include "scene/gui/texture_rect.h"
 #include "scene/main/scene_tree.h"
 #include "scene/resources/3d/sky_material.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/sky.h"
 #include "scene/resources/surface_tool.h"
+#include "scene/resources/world_2d.h"
 #include "servers/rendering/rendering_server.h"
 
 constexpr real_t GIZMO_ARROW_SIZE = 0.35;
@@ -3315,6 +3317,8 @@ void Node3DEditorViewport::_project_settings_changed() {
 
 	const Viewport::AnisotropicFiltering anisotropic_filtering_level = Viewport::AnisotropicFiltering(int(GLOBAL_GET("rendering/textures/default_filters/anisotropic_filtering_level")));
 	viewport->set_anisotropic_filtering_level(anisotropic_filtering_level);
+
+	_update_camera_2d_preview_settings();
 }
 
 static void override_label_colors(Control *p_control) {
@@ -3413,6 +3417,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 
 		case NOTIFICATION_RESIZED: {
 			callable_mp(this, &Node3DEditorViewport::update_transform_gizmo_view).call_deferred();
+			_update_camera_2d_preview_settings();
 		} break;
 
 		case NOTIFICATION_PROCESS: {
@@ -4947,6 +4952,13 @@ void Node3DEditorViewport::_menu_option(int p_option) {
 			view_display_menu->get_popup()->set_item_checked(idx, current);
 
 		} break;
+		case VIEW_2D_PREVIEW: {
+			int idx = view_display_menu->get_popup()->get_item_index(VIEW_2D_PREVIEW);
+			bool current = view_display_menu->get_popup()->is_item_checked(idx);
+			current = !current;
+			view_display_menu->get_popup()->set_item_checked(idx, current);
+			_toggle_2d_preview(current);
+		} break;
 		case VIEW_CINEMATIC_PREVIEW: {
 			int idx = view_display_menu->get_popup()->get_item_index(VIEW_CINEMATIC_PREVIEW);
 			bool current = view_display_menu->get_popup()->is_item_checked(idx);
@@ -5334,6 +5346,119 @@ void Node3DEditorViewport::_toggle_pilot_preview(bool p_activate) {
 	}
 }
 
+void Node3DEditorViewport::_toggle_2d_preview(bool p_enable) {
+	previewing_2d = p_enable;
+	if (preview_2d_overlay) {
+		preview_2d_overlay->set_visible(p_enable);
+	}
+	if (p_enable) {
+		_update_camera_2d_preview_settings();
+	}
+}
+
+void Node3DEditorViewport::_forward_2d_preview_overlay_input(const Ref<InputEvent> &p_event) {
+	SubViewport *scene_root = EditorNode::get_singleton()->get_scene_root();
+	if (!scene_root || !scene_root->is_inside_tree()) {
+		return;
+	}
+	const Ref<InputEventMouse> me = p_event;
+	if (me.is_null()) {
+		return;
+	}
+
+	const Size2 overlay_size = preview_2d_overlay->get_size();
+	const Size2 scene_root_size = Size2(scene_root->get_size());
+	if (overlay_size.x <= 0 || overlay_size.y <= 0 || scene_root_size.x <= 0 || scene_root_size.y <= 0) {
+		return;
+	}
+	const Vector2 local_pos = me->get_position() * (scene_root_size / overlay_size);
+
+	Control *target = scene_root->gui_find_control(local_pos);
+	if (!target) {
+		return;
+	}
+
+	Ref<InputEventMouse> translated = me->duplicate();
+	translated->set_position(local_pos);
+	translated->set_global_position(local_pos);
+	scene_root->push_input(translated, true);
+	preview_2d_overlay->accept_event();
+}
+
+void Node3DEditorViewport::_update_camera_2d_preview_settings() {
+	if (!previewing_2d) {
+		return;
+	}
+
+	viewport->set_default_canvas_item_texture_filter(Viewport::DefaultCanvasItemTextureFilter(int(GLOBAL_GET("rendering/textures/canvas_textures/default_texture_filter"))));
+	// FIXME: Font oversampling doesn't visibly re-rasterize existing glyphs when set on a SubViewport
+	// after fonts have been cached. Setting it here is still correct for newly-rendered text.
+	viewport->set_use_oversampling(bool(GLOBAL_GET("gui/fonts/dynamic_fonts/use_oversampling")));
+
+	const Size2 video_mode = Size2(viewport->get_size());
+	const Size2 desired_res = Size2(int(GLOBAL_GET("display/window/size/viewport_width")), int(GLOBAL_GET("display/window/size/viewport_height")));
+	if (desired_res.x <= 0 || desired_res.y <= 0 || video_mode.x <= 0 || video_mode.y <= 0) {
+		return;
+	}
+
+	const String stretch_mode = GLOBAL_GET("display/window/stretch/mode");
+	const String stretch_aspect = GLOBAL_GET("display/window/stretch/aspect");
+	const bool integer_scaling = GLOBAL_GET("display/window/stretch/scale_mode") == "integer";
+
+	Size2 viewport_size;
+	Size2 screen_size;
+
+	if (stretch_mode == "disabled") {
+		viewport_size = video_mode;
+		screen_size = video_mode;
+	} else {
+		const float viewport_aspect = desired_res.aspect();
+		const float video_mode_aspect = video_mode.aspect();
+
+		if (stretch_aspect == "ignore" || Math::is_equal_approx(viewport_aspect, video_mode_aspect)) {
+			viewport_size = desired_res;
+			screen_size = video_mode;
+		} else if (viewport_aspect < video_mode_aspect) {
+			if (stretch_aspect == "keep_height" || stretch_aspect == "expand") {
+				viewport_size.x = desired_res.y * video_mode_aspect;
+				viewport_size.y = desired_res.y;
+				screen_size = video_mode;
+			} else {
+				viewport_size = desired_res;
+				screen_size.x = video_mode.y * viewport_aspect;
+				screen_size.y = video_mode.y;
+			}
+		} else {
+			if (stretch_aspect == "keep_width" || stretch_aspect == "expand") {
+				viewport_size.x = desired_res.x;
+				viewport_size.y = desired_res.x / video_mode_aspect;
+				screen_size = video_mode;
+			} else {
+				viewport_size = desired_res;
+				screen_size.x = video_mode.x;
+				screen_size.y = video_mode.x / viewport_aspect;
+			}
+		}
+
+		screen_size = screen_size.floor();
+		viewport_size = viewport_size.floor();
+
+		if (integer_scaling) {
+			const Size2 screen_scale = (screen_size / viewport_size).floor();
+			const int scale_factor = MAX(1, int(MIN(screen_scale.x, screen_scale.y)));
+			screen_size = viewport_size * scale_factor;
+		}
+	}
+
+	if (preview_2d_overlay) {
+		const Vector2 margin = (video_mode - screen_size) * 0.5;
+		preview_2d_overlay->set_position(margin);
+		preview_2d_overlay->set_size(screen_size);
+	}
+	const Vector2 zoom = screen_size / viewport_size;
+	viewport->set_oversampling_override(MAX(zoom.x, zoom.y));
+}
+
 void Node3DEditorViewport::_toggle_cinema_preview(bool p_activate) {
 	previewing_cinema = p_activate;
 	_update_navigation_controls_visibility();
@@ -5658,6 +5783,17 @@ void Node3DEditorViewport::set_state(const Dictionary &p_state) {
 		view_display_menu->get_popup()->set_item_checked(idx, half_res);
 		_update_shrink();
 	}
+	if (p_state.has("2d_preview")) {
+		previewing_2d = p_state["2d_preview"];
+
+		int idx = view_display_menu->get_popup()->get_item_index(VIEW_2D_PREVIEW);
+		view_display_menu->get_popup()->set_item_checked(idx, previewing_2d);
+
+		if (previewing_2d) {
+			// If previous state was restored, make it effective.
+			_toggle_2d_preview(true);
+		}
+	}
 	if (p_state.has("cinematic_preview")) {
 		previewing_cinema = p_state["cinematic_preview"];
 
@@ -5733,6 +5869,7 @@ Dictionary Node3DEditorViewport::get_state() const {
 	d["information"] = view_display_menu->get_popup()->is_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_INFORMATION));
 	d["frame_time"] = view_display_menu->get_popup()->is_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_FRAME_TIME));
 	d["half_res"] = view_display_menu->get_popup()->is_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_HALF_RESOLUTION));
+	d["2d_preview"] = view_display_menu->get_popup()->is_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_2D_PREVIEW));
 	d["cinematic_preview"] = view_display_menu->get_popup()->is_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_CINEMATIC_PREVIEW));
 	if (previewing) {
 		d["previewing"] = EditorNode::get_singleton()->get_edited_scene()->get_path_to(previewing);
@@ -7272,13 +7409,13 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	c->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
 	viewport = memnew(SubViewport);
 	viewport->set_disable_input(true);
-
 	c->add_child(viewport);
 	surface = memnew(Control);
 	SET_DRAG_FORWARDING_CD(surface, Node3DEditorViewport);
 	add_child(surface);
 	surface->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
 	surface->set_clip_contents(true);
+
 	camera = memnew(Camera3D);
 	camera->set_disable_gizmos(true);
 	camera->set_cull_mask(((1 << 20) - 1) | (1 << (GIZMO_BASE_LAYER + p_index)) | (1 << GIZMO_EDIT_LAYER) | (1 << GIZMO_GRID_LAYER) | (1 << MISC_TOOL_LAYER));
@@ -7408,6 +7545,8 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_GRID), true);
 
 	view_display_menu->get_popup()->add_separator();
+	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_2d_preview", TTRC("2D Preview")), VIEW_2D_PREVIEW);
+	view_display_menu->get_popup()->set_item_checked(view_display_menu->get_popup()->get_item_index(VIEW_2D_PREVIEW), previewing_2d);
 	view_display_menu->get_popup()->add_check_shortcut(ED_SHORTCUT("spatial_editor/view_cinematic_preview", TTRC("Cinematic Preview")), VIEW_CINEMATIC_PREVIEW);
 
 	view_display_menu->get_popup()->add_separator();
@@ -7595,6 +7734,15 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	frame_time_vbox->add_child(fps_label);
 
 	surface->add_child(top_right_vbox);
+
+	preview_2d_overlay = memnew(TextureRect);
+	surface->add_child(preview_2d_overlay);
+	preview_2d_overlay->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
+	preview_2d_overlay->set_stretch_mode(TextureRect::STRETCH_SCALE);
+	preview_2d_overlay->set_mouse_filter(Control::MOUSE_FILTER_PASS);
+	preview_2d_overlay->set_texture(EditorNode::get_singleton()->get_scene_root()->get_texture());
+	preview_2d_overlay->set_visible(previewing_2d);
+	preview_2d_overlay->connect(SceneStringName(gui_input), callable_mp(this, &Node3DEditorViewport::_forward_2d_preview_overlay_input));
 
 	accept = nullptr;
 

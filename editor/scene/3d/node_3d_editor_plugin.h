@@ -62,6 +62,7 @@ class RichTextLabel;
 class SplitContainer;
 class SubViewport;
 class SubViewportContainer;
+class TextureRect;
 class VSeparator;
 class VSplitContainer;
 class ViewportNavigationControl;
@@ -175,6 +176,7 @@ class Node3DEditorViewport : public Control {
 		// > Keep in sync with menu.
 
 		VIEW_LOCK_ROTATION,
+		VIEW_2D_PREVIEW,
 		VIEW_CINEMATIC_PREVIEW,
 		VIEW_AUTO_ORTHOGONAL,
 		VIEW_MAX
@@ -245,6 +247,7 @@ private:
 	Control *surface = nullptr;
 	SubViewport *viewport = nullptr;
 	Camera3D *camera = nullptr;
+	TextureRect *preview_2d_overlay = nullptr;
 	bool transforming = false;
 	bool transform_gizmo_visible = true;
 	bool collision_reposition = false;
@@ -450,6 +453,7 @@ private:
 	Camera3D *preview = nullptr;
 
 	bool previewing_camera = false;
+	bool previewing_2d = true;
 	bool previewing_cinema = false;
 	int times_focused_consecutively = 0;
 	bool pilot_preview_enabled = false;
@@ -470,6 +474,9 @@ private:
 	void _reset_follow_mode_count();
 	void _toggle_camera_preview(bool);
 	void _toggle_pilot_preview(bool);
+	void _toggle_2d_preview(bool p_enable);
+	void _update_camera_2d_preview_settings();
+	void _forward_2d_preview_overlay_input(const Ref<InputEvent> &p_event);
 	void _toggle_cinema_preview(bool);
 	void _init_gizmo_instance(int p_idx);
 	void _finish_gizmo_instances();
@@ -559,6 +566,8 @@ public:
 	SubViewport *get_viewport_node() { return viewport; }
 	Camera3D *get_camera_3d() { return camera; } // return the default camera object.
 	Control *get_surface() { return surface; }
+
+	bool is_2d_preview_enabled() const { return previewing_2d; }
 
 	Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p_index);
 	~Node3DEditorViewport();
@@ -1062,6 +1071,15 @@ public:
 		return viewports[p_idx];
 	}
 	Node3DEditorViewport *get_last_used_viewport();
+
+	bool is_2d_preview_enabled_on_any_viewport() const {
+		for (unsigned int i = 0; i < VIEWPORTS_COUNT; i++) {
+			if (viewports[i] && viewports[i]->is_2d_preview_enabled()) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	void set_freelook_viewport(Node3DEditorViewport *p_viewport) { freelook_viewport = p_viewport; }
 	Node3DEditorViewport *get_freelook_viewport() const { return freelook_viewport; }
