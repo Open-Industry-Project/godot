@@ -477,6 +477,14 @@ void EditorNode::_update_from_settings() {
 	}
 	_update_title();
 
+	{
+		const int vp_w = int(GLOBAL_GET("display/window/size/viewport_width"));
+		const int vp_h = int(GLOBAL_GET("display/window/size/viewport_height"));
+		if (vp_w > 0 && vp_h > 0 && scene_root->get_size() != Size2i(vp_w, vp_h)) {
+			scene_root->set_size(Size2i(vp_w, vp_h));
+		}
+	}
+
 	int current_filter = GLOBAL_GET("rendering/textures/canvas_textures/default_texture_filter");
 	if (current_filter != scene_root->get_default_canvas_item_texture_filter()) {
 		Viewport::DefaultCanvasItemTextureFilter tf = (Viewport::DefaultCanvasItemTextureFilter)current_filter;
@@ -1008,7 +1016,7 @@ void EditorNode::_notification(int p_what) {
 			}
 			default_layout->set_value("docks", "dock_9", String(",").join(bottom_docks));
 
-			RenderingServer::get_singleton()->viewport_set_disable_2d(get_scene_root()->get_viewport_rid(), true);
+			RenderingServer::get_singleton()->viewport_set_disable_2d(get_scene_root()->get_viewport_rid(), false);
 			RenderingServer::get_singleton()->viewport_set_environment_mode(get_viewport()->get_viewport_rid(), RSE::VIEWPORT_ENVIRONMENT_DISABLED);
 			DisplayServer::get_singleton()->screen_set_keep_on(EDITOR_GET("interface/editor/display/keep_screen_on"));
 
@@ -3304,6 +3312,10 @@ void EditorNode::_edit_current(bool p_skip_foreign, bool p_skip_inspector_update
 			main_plugin = nullptr;
 		}
 		EditorPlugin *editor_plugin_screen = editor_main_screen->get_selected_plugin();
+
+		if (!skip_main_plugin && Object::cast_to<Node3DEditorPlugin>(editor_plugin_screen) && Object::cast_to<CanvasItemEditorPlugin>(main_plugin) && Node3DEditor::get_singleton() && Node3DEditor::get_singleton()->is_2d_preview_enabled_on_any_viewport()) {
+			skip_main_plugin = true;
+		}
 
 		ObjectID editor_owner_id = editor_owner->get_instance_id();
 		if (main_plugin && !skip_main_plugin) {
@@ -9093,8 +9105,16 @@ EditorNode::EditorNode() {
 	scene_root->set_translation_domain(StringName());
 	scene_root->set_embedding_subwindows(true);
 	scene_root->set_disable_3d(true);
-	scene_root->set_disable_input(true);
+	scene_root->set_transparent_background(true);
 	scene_root->set_as_audio_listener_2d(true);
+	add_child(scene_root);
+	{
+		const int vp_w = int(GLOBAL_GET("display/window/size/viewport_width"));
+		const int vp_h = int(GLOBAL_GET("display/window/size/viewport_height"));
+		if (vp_w > 0 && vp_h > 0) {
+			scene_root->set_size(Size2i(vp_w, vp_h));
+		}
+	}
 
 	accept = memnew(AcceptDialog);
 	accept->set_autowrap(true);

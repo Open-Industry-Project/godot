@@ -4450,7 +4450,11 @@ bool Viewport::is_visible_subviewport() const {
 		return true;
 	}
 	SubViewportContainer *container = Object::cast_to<SubViewportContainer>(get_parent());
-	return container && container->is_visible_in_tree();
+	if (container) {
+		return container->is_visible_in_tree();
+	}
+	// Editor-managed SubViewport (e.g. EditorNode's scene_root, exposed via texture views).
+	return is_inside_tree();
 }
 #endif // TOOLS_ENABLED
 
