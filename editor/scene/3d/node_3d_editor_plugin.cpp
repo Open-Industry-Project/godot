@@ -7418,6 +7418,15 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	surface->set_anchors_and_offsets_preset(Control::PRESET_FULL_RECT);
 	surface->set_clip_contents(true);
 
+	preview_2d_overlay = memnew(TextureRect);
+	surface->add_child(preview_2d_overlay);
+	preview_2d_overlay->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
+	preview_2d_overlay->set_stretch_mode(TextureRect::STRETCH_SCALE);
+	preview_2d_overlay->set_mouse_filter(Control::MOUSE_FILTER_PASS);
+	preview_2d_overlay->set_texture(EditorNode::get_singleton()->get_scene_root()->get_texture());
+	preview_2d_overlay->set_visible(previewing_2d);
+	preview_2d_overlay->connect(SceneStringName(gui_input), callable_mp(this, &Node3DEditorViewport::_forward_2d_preview_overlay_input));
+
 	camera = memnew(Camera3D);
 	camera->set_disable_gizmos(true);
 	camera->set_cull_mask(((1 << 20) - 1) | (1 << (GIZMO_BASE_LAYER + p_index)) | (1 << GIZMO_EDIT_LAYER) | (1 << GIZMO_GRID_LAYER) | (1 << MISC_TOOL_LAYER));
@@ -7736,15 +7745,6 @@ Node3DEditorViewport::Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p
 	frame_time_vbox->add_child(fps_label);
 
 	surface->add_child(top_right_vbox);
-
-	preview_2d_overlay = memnew(TextureRect);
-	surface->add_child(preview_2d_overlay);
-	preview_2d_overlay->set_expand_mode(TextureRect::EXPAND_IGNORE_SIZE);
-	preview_2d_overlay->set_stretch_mode(TextureRect::STRETCH_SCALE);
-	preview_2d_overlay->set_mouse_filter(Control::MOUSE_FILTER_PASS);
-	preview_2d_overlay->set_texture(EditorNode::get_singleton()->get_scene_root()->get_texture());
-	preview_2d_overlay->set_visible(previewing_2d);
-	preview_2d_overlay->connect(SceneStringName(gui_input), callable_mp(this, &Node3DEditorViewport::_forward_2d_preview_overlay_input));
 
 	accept = nullptr;
 
@@ -10228,6 +10228,75 @@ void Node3DEditor::shortcut_input(const Ref<InputEvent> &p_event) {
 	}
 
 	snap_key_enabled = Input::get_singleton()->is_key_pressed(Key::CMD_OR_CTRL);
+
+	Ref<InputEventKey> k = p_event;
+	if (k.is_null() || !k->is_pressed() || k->is_echo()) {
+		return;
+	}
+
+	struct MenuEntry {
+		const char *shortcut;
+		MenuOption menu;
+	};
+	static const MenuEntry actions[] = {
+		{ "spatial_editor/tool_transform", MENU_TOOL_TRANSFORM },
+		{ "spatial_editor/tool_move", MENU_TOOL_MOVE },
+		{ "spatial_editor/tool_rotate", MENU_TOOL_ROTATE },
+		{ "spatial_editor/tool_scale", MENU_TOOL_SCALE },
+		{ "spatial_editor/tool_select", MENU_TOOL_SELECT },
+		{ "spatial_editor/measure", MENU_RULER },
+		{ "editor/lock_selected_nodes", MENU_LOCK_SELECTED },
+		{ "editor/unlock_selected_nodes", MENU_UNLOCK_SELECTED },
+		{ "editor/group_selected_nodes", MENU_GROUP_SELECTED },
+		{ "editor/ungroup_selected_nodes", MENU_UNGROUP_SELECTED },
+	};
+	for (const MenuEntry &e : actions) {
+		if (ED_IS_SHORTCUT(e.shortcut, p_event)) {
+			_menu_item_pressed(e.menu);
+			get_viewport()->set_input_as_handled();
+			return;
+		}
+	}
+
+	struct ToggleEntry {
+		const char *shortcut;
+		ToolOptions opt;
+		MenuOption menu;
+	};
+	static const ToggleEntry toggles[] = {
+		{ "spatial_editor/local_coords", TOOL_OPT_LOCAL_COORDS, MENU_TOOL_LOCAL_COORDS },
+		{ "spatial_editor/snap", TOOL_OPT_USE_SNAP, MENU_TOOL_USE_SNAP },
+		{ "spatial_editor/trackball", TOOL_OPT_USE_TRACKBALL, MENU_TOOL_USE_TRACKBALL },
+		{ "spatial_editor/preserve_children_transform", TOOL_OPT_PRESERVE_CHILDREN_TRANSFORM, MENU_TOOL_PRESERVE_CHILDREN_TRANSFORM },
+	};
+	for (const ToggleEntry &t : toggles) {
+		if (ED_IS_SHORTCUT(t.shortcut, p_event) && tool_option_button[t.opt]) {
+			const bool new_state = !tool_option_button[t.opt]->is_pressed();
+			tool_option_button[t.opt]->set_pressed_no_signal(new_state);
+			_menu_item_toggled(new_state, t.menu);
+			get_viewport()->set_input_as_handled();
+			return;
+		}
+	}
+
+	Node3DEditorViewport *vp = get_last_used_viewport();
+	if (!vp) {
+		return;
+	}
+	if (ED_IS_SHORTCUT("spatial_editor/toggle_camera_preview", p_event) && vp->preview_camera) {
+		const bool new_state = !vp->preview_camera->is_pressed();
+		vp->preview_camera->set_pressed_no_signal(new_state);
+		vp->_toggle_camera_preview(new_state);
+		get_viewport()->set_input_as_handled();
+		return;
+	}
+	if (ED_IS_SHORTCUT("spatial_editor/toggle_pilot_preview", p_event) && vp->pilot_camera) {
+		const bool new_state = !vp->pilot_camera->is_pressed();
+		vp->pilot_camera->set_pressed_no_signal(new_state);
+		vp->_toggle_pilot_preview(new_state);
+		get_viewport()->set_input_as_handled();
+		return;
+	}
 }
 
 void Node3DEditor::_sun_environ_settings_pressed() {
@@ -10526,6 +10595,40 @@ void Node3DEditor::set_can_preview(Camera3D *p_preview) {
 	}
 
 	viewports[last_used_viewport]->switch_preview_camera(p_preview);
+}
+
+void Node3DEditor::set_immersive_mode(bool p_enter) {
+	if (toolbar_margin) {
+		toolbar_margin->set_visible(!p_enter);
+	}
+	for (uint32_t i = 0; i < VIEWPORTS_COUNT; i++) {
+		if (viewports[i]) {
+			viewports[i]->set_immersive_mode(p_enter);
+		}
+	}
+}
+
+void Node3DEditorViewport::set_immersive_mode(bool p_enter) {
+	if (!surface) {
+		return;
+	}
+	if (p_enter) {
+		immersive_hidden_surface_children.clear();
+		for (int i = 0; i < surface->get_child_count(); i++) {
+			Control *child = Object::cast_to<Control>(surface->get_child(i));
+			if (child && child != preview_2d_overlay && child->is_visible()) {
+				immersive_hidden_surface_children.push_back(child);
+				child->set_visible(false);
+			}
+		}
+	} else {
+		for (Control *c : immersive_hidden_surface_children) {
+			if (c) {
+				c->set_visible(true);
+			}
+		}
+		immersive_hidden_surface_children.clear();
+	}
 }
 
 VSplitContainer *Node3DEditor::get_shader_split() {
@@ -11154,7 +11257,7 @@ Node3DEditor::Node3DEditor() {
 	editor_selection = EditorNode::get_singleton()->get_editor_selection();
 	editor_selection->add_editor_plugin(this);
 
-	MarginContainer *toolbar_margin = memnew(MarginContainer);
+	toolbar_margin = memnew(MarginContainer);
 	toolbar_margin->set_theme_type_variation("MainToolBarMargin");
 	vbc->add_child(toolbar_margin);
 
