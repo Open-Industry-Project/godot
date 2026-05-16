@@ -49,6 +49,7 @@ class Control;
 class FileDialog;
 class HBoxContainer;
 class ImageTexture;
+class Label;
 class MenuBar;
 class MenuButton;
 class OptionButton;
@@ -60,6 +61,7 @@ class TextureProgressBar;
 class Timer;
 class Translation;
 class Tree;
+class Tween;
 class VBoxContainer;
 class VSplitContainer;
 class Window;
@@ -432,6 +434,7 @@ private:
 	Timer *editor_layout_save_delay_timer = nullptr;
 	Timer *scan_changes_timer = nullptr;
 	Button *distraction_free = nullptr;
+	bool _distraction_free_last_click_shift = false;
 	Callable palette_file_selected_callback;
 
 	EditorBottomPanel *bottom_panel = nullptr;
@@ -444,6 +447,12 @@ private:
 
 	bool scene_distraction_free = false;
 	bool script_distraction_free = false;
+	bool immersive_mode_enabled = false;
+	bool immersive_prev_distraction_free = false;
+	PanelContainer *immersive_mode_hint = nullptr;
+	Label *immersive_mode_hint_label = nullptr;
+	Ref<Tween> immersive_mode_hint_tween;
+	Timer *immersive_mode_exit_hold_timer = nullptr;
 
 	bool changing_scene = false;
 	bool cmdline_mode = false;
@@ -696,6 +705,8 @@ private:
 	void _update_addon_config();
 
 	void _toggle_distraction_free_mode();
+	void _toggle_immersive_mode();
+	void _distraction_free_gui_input(const Ref<InputEvent> &p_event);
 
 	void _inherit_imported(const String &p_action);
 	void _open_imported();
@@ -841,6 +852,9 @@ public:
 	void set_distraction_free_mode(bool p_enter);
 	bool is_distraction_free_mode_enabled() const;
 	void update_distraction_free_button_theme();
+
+	void set_immersive_mode(bool p_enter);
+	bool is_immersive_mode_enabled() const;
 
 	void set_center_split_offset(int p_offset);
 

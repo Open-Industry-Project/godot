@@ -155,12 +155,15 @@
 #include "scene/2d/node_2d.h"
 #include "scene/3d/bone_attachment_3d.h"
 #include "scene/animation/animation_tree.h"
+#include "scene/animation/tween.h"
 #include "scene/gui/color_picker.h"
 #include "scene/gui/dialogs.h"
 #include "scene/gui/file_dialog.h"
+#include "scene/gui/label.h"
 #include "scene/gui/menu_bar.h"
 #include "scene/gui/menu_button.h"
 #include "scene/gui/panel.h"
+#include "scene/gui/panel_container.h"
 #include "scene/gui/popup.h"
 #include "scene/gui/rich_text_label.h"
 #include "scene/gui/split_container.h"
@@ -174,6 +177,7 @@
 #include "scene/resources/image_texture.h"
 #include "scene/resources/packed_scene.h"
 #include "scene/resources/portable_compressed_texture.h"
+#include "scene/resources/style_box_flat.h"
 #include "scene/theme/theme_db.h"
 #include "servers/audio/audio_server.h"
 #include "servers/display/display_server.h"
@@ -411,6 +415,15 @@ void EditorNode::shortcut_input(const Ref<InputEvent> &p_event) {
 	ERR_FAIL_COND(p_event.is_null());
 
 	Ref<InputEventKey> k = p_event;
+
+	if (immersive_mode_enabled && immersive_mode_exit_hold_timer && k.is_valid() && k->get_keycode() == Key::ESCAPE && !k->is_alt_pressed() && !k->is_ctrl_pressed() && !k->is_shift_pressed() && !k->is_meta_pressed()) {
+		if (k->is_pressed() && !k->is_echo()) {
+			immersive_mode_exit_hold_timer->start();
+		} else if (!k->is_pressed()) {
+			immersive_mode_exit_hold_timer->stop();
+		}
+	}
+
 	if ((k.is_valid() && k->is_pressed() && !k->is_echo()) || Object::cast_to<InputEventShortcut>(*p_event)) {
 		bool is_handled = true;
 		if (ED_IS_SHORTCUT("editor/filter_files", p_event)) {
@@ -433,6 +446,26 @@ void EditorNode::shortcut_input(const Ref<InputEvent> &p_event) {
 			editor_main_screen->select_prev();
 		} else if (ED_IS_SHORTCUT("editor/command_palette", p_event)) {
 			_open_command_palette();
+		} else if (ED_IS_SHORTCUT("editor/immersive_mode", p_event)) {
+			_toggle_immersive_mode();
+		} else if (ED_IS_SHORTCUT("editor/fullscreen_mode", p_event)) {
+			_menu_option(EDITOR_TOGGLE_FULLSCREEN);
+		} else if (ED_IS_SHORTCUT("ui_undo", p_event)) {
+			_menu_option(SCENE_UNDO);
+		} else if (ED_IS_SHORTCUT("ui_redo", p_event)) {
+			_menu_option(SCENE_REDO);
+		} else if (ED_IS_SHORTCUT("editor/save_scene", p_event)) {
+			_menu_option(SCENE_SAVE_SCENE);
+		} else if (ED_IS_SHORTCUT("editor/save_scene_as", p_event)) {
+			_menu_option(SCENE_SAVE_AS_SCENE);
+		} else if (ED_IS_SHORTCUT("editor/save_all_scenes", p_event)) {
+			_menu_option(SCENE_SAVE_ALL_SCENES);
+		} else if (ED_IS_SHORTCUT("Open Industry Project/Start Simulation", p_event)) {
+			EditorInterface::get_singleton()->start_simulation();
+		} else if (ED_IS_SHORTCUT("Open Industry Project/Toggle Pause Simulation", p_event)) {
+			EditorInterface::get_singleton()->toggle_pause_simulation();
+		} else if (ED_IS_SHORTCUT("Open Industry Project/Stop Simulation", p_event)) {
+			EditorInterface::get_singleton()->stop_simulation();
 		} else if (ED_IS_SHORTCUT("editor/toggle_last_opened_bottom_panel", p_event)) {
 			bottom_panel->toggle_last_opened_bottom_panel();
 		} else if (ED_IS_SHORTCUT("editor/toggle_selected_nodes_visibility", p_event)) {
@@ -6882,6 +6915,13 @@ void EditorNode::_prepare_confirmation_dialog(ConfirmationDialog *dialog) {
 }
 
 void EditorNode::_toggle_distraction_free_mode() {
+	if (_distraction_free_last_click_shift) {
+		_distraction_free_last_click_shift = false;
+		distraction_free->set_pressed_no_signal(!distraction_free->is_pressed());
+		_toggle_immersive_mode();
+		return;
+	}
+
 	if (EDITOR_GET("interface/editor/behavior/separate_distraction_mode")) {
 		int screen = editor_main_screen->get_selected_index();
 
@@ -6894,6 +6934,13 @@ void EditorNode::_toggle_distraction_free_mode() {
 		}
 	} else {
 		set_distraction_free_mode(distraction_free->is_pressed());
+	}
+}
+
+void EditorNode::_distraction_free_gui_input(const Ref<InputEvent> &p_event) {
+	Ref<InputEventMouseButton> mb = p_event;
+	if (mb.is_valid() && mb->is_pressed() && mb->get_button_index() == MouseButton::LEFT) {
+		_distraction_free_last_click_shift = mb->is_shift_pressed();
 	}
 }
 
@@ -6935,6 +6982,76 @@ void EditorNode::update_distraction_free_button_theme() {
 		distraction_free->set_theme_type_variation("BottomPanelButton");
 		distraction_free->remove_theme_style_override(SceneStringName(pressed));
 	}
+}
+
+void EditorNode::_toggle_immersive_mode() {
+	set_immersive_mode(!immersive_mode_enabled);
+}
+
+void EditorNode::set_immersive_mode(bool p_enter) {
+	if (immersive_mode_enabled == p_enter) {
+		return;
+	}
+	immersive_mode_enabled = p_enter;
+
+	if (immersive_mode_hint_tween.is_valid()) {
+		immersive_mode_hint_tween->kill();
+	}
+	if (immersive_mode_exit_hold_timer) {
+		immersive_mode_exit_hold_timer->stop();
+	}
+
+	if (p_enter) {
+		immersive_prev_distraction_free = is_distraction_free_mode_enabled();
+		if (!immersive_prev_distraction_free) {
+			set_distraction_free_mode(true);
+		}
+		if (title_bar) {
+			title_bar->hide();
+		}
+		if (scene_tabs) {
+			scene_tabs->hide();
+		}
+		if (bottom_panel) {
+			bottom_panel->hide();
+		}
+
+		if (immersive_mode_hint) {
+			Ref<Shortcut> sc = ED_GET_SHORTCUT("editor/immersive_mode");
+			const String keys = sc.is_valid() ? sc->get_as_text() : String();
+			immersive_mode_hint_label->set_text(keys.is_empty() ? TTR("Immersive mode (hold Esc to exit)") : vformat(TTR("Immersive mode (%s or hold Esc to exit)"), keys));
+			immersive_mode_hint->set_modulate(Color(1, 1, 1, 1));
+			immersive_mode_hint->show();
+			immersive_mode_hint_tween = immersive_mode_hint->create_tween();
+			immersive_mode_hint_tween->tween_interval(2.5);
+			immersive_mode_hint_tween->tween_property(immersive_mode_hint, NodePath("modulate:a"), 0.0, 0.5);
+			immersive_mode_hint_tween->tween_callback(callable_mp((CanvasItem *)immersive_mode_hint, &CanvasItem::hide));
+		}
+	} else {
+		if (title_bar) {
+			title_bar->show();
+		}
+		if (scene_tabs) {
+			scene_tabs->show();
+		}
+		if (bottom_panel) {
+			bottom_panel->show();
+		}
+		if (!immersive_prev_distraction_free) {
+			set_distraction_free_mode(false);
+		}
+		if (immersive_mode_hint) {
+			immersive_mode_hint->hide();
+		}
+	}
+
+	if (Node3DEditor::get_singleton()) {
+		Node3DEditor::get_singleton()->set_immersive_mode(p_enter);
+	}
+}
+
+bool EditorNode::is_immersive_mode_enabled() const {
+	return immersive_mode_enabled;
 }
 
 void EditorNode::set_center_split_offset(int p_offset) {
@@ -9061,11 +9178,22 @@ EditorNode::EditorNode() {
 	distraction_free->set_theme_type_variation("FlatMenuButton");
 	ED_SHORTCUT_AND_COMMAND("editor/distraction_free_mode", TTRC("Distraction Free Mode"), KeyModifierMask::CTRL | KeyModifierMask::SHIFT | Key::F11);
 	ED_SHORTCUT_OVERRIDE("editor/distraction_free_mode", "macos", KeyModifierMask::META | KeyModifierMask::SHIFT | Key::D);
+	ED_SHORTCUT_AND_COMMAND("editor/immersive_mode", TTRC("Immersive Mode"), KeyModifierMask::CTRL | Key::F11);
 	ED_SHORTCUT_AND_COMMAND("editor/toggle_last_opened_bottom_panel", TTRC("Toggle Last Opened Bottom Panel"), KeyModifierMask::CMD_OR_CTRL | Key::J);
 	distraction_free->set_shortcut(ED_GET_SHORTCUT("editor/distraction_free_mode"));
-	distraction_free->set_tooltip_text(TTRC("Toggle distraction-free mode."));
+	{
+		String tip = TTR("Toggle distraction-free mode.");
+		Ref<Shortcut> imm_sc = ED_GET_SHORTCUT("editor/immersive_mode");
+		if (imm_sc.is_valid()) {
+			tip += "\n" + TTR("Shift-click for immersive mode") + " (" + imm_sc->get_as_text() + ").";
+		} else {
+			tip += "\n" + TTR("Shift-click for immersive mode.");
+		}
+		distraction_free->set_tooltip_text(tip);
+	}
 	distraction_free->set_toggle_mode(true);
 	scene_tabs->add_extra_button(distraction_free);
+	distraction_free->connect(SceneStringName(gui_input), callable_mp(this, &EditorNode::_distraction_free_gui_input));
 	distraction_free->connect(SceneStringName(pressed), callable_mp(this, &EditorNode::_toggle_distraction_free_mode));
 
 	editor_main_screen = memnew(EditorMainScreen);
@@ -9073,6 +9201,35 @@ EditorNode::EditorNode() {
 	editor_main_screen->set_draw_behind_parent(true);
 	srt->add_child(editor_main_screen);
 	editor_main_screen->set_v_size_flags(Control::SIZE_EXPAND_FILL);
+
+	immersive_mode_hint = memnew(PanelContainer);
+	gui_base->add_child(immersive_mode_hint);
+	immersive_mode_hint->set_anchors_preset(Control::PRESET_CENTER_TOP);
+	immersive_mode_hint->set_h_grow_direction(Control::GROW_DIRECTION_BOTH);
+	immersive_mode_hint->set_v_grow_direction(Control::GROW_DIRECTION_END);
+	immersive_mode_hint->set_offset(SIDE_TOP, 24 * EDSCALE);
+	immersive_mode_hint->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+	immersive_mode_hint->hide();
+	{
+		Ref<StyleBoxFlat> hint_bg;
+		hint_bg.instantiate();
+		hint_bg->set_bg_color(Color(0, 0, 0, 0.78));
+		hint_bg->set_corner_radius_all(6 * EDSCALE);
+		hint_bg->set_content_margin_all(12 * EDSCALE);
+		immersive_mode_hint->add_theme_style_override(SceneStringName(panel), hint_bg);
+	}
+	immersive_mode_hint_label = memnew(Label);
+	immersive_mode_hint_label->set_mouse_filter(Control::MOUSE_FILTER_IGNORE);
+	immersive_mode_hint_label->add_theme_color_override(SceneStringName(font_color), Color(1, 1, 1));
+	immersive_mode_hint_label->add_theme_color_override("font_outline_color", Color(0, 0, 0));
+	immersive_mode_hint_label->add_theme_constant_override("outline_size", 4 * EDSCALE);
+	immersive_mode_hint->add_child(immersive_mode_hint_label);
+
+	immersive_mode_exit_hold_timer = memnew(Timer);
+	immersive_mode_exit_hold_timer->set_wait_time(1.0);
+	immersive_mode_exit_hold_timer->set_one_shot(true);
+	add_child(immersive_mode_exit_hold_timer);
+	immersive_mode_exit_hold_timer->connect("timeout", callable_mp(this, &EditorNode::set_immersive_mode).bind(false));
 
 	scene_root = memnew(SubViewport);
 	scene_root->set_auto_translate_mode(AUTO_TRANSLATE_MODE_ALWAYS);

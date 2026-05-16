@@ -52,6 +52,7 @@ class EditorSelection;
 class EditorSpinSlider;
 class HSplitContainer;
 class LineEdit;
+class MarginContainer;
 class MenuButton;
 class Node3DEditor;
 class Node3DEditorViewport;
@@ -455,6 +456,7 @@ private:
 	bool previewing_camera = false;
 	bool previewing_2d = true;
 	bool previewing_cinema = false;
+	Vector<Control *> immersive_hidden_surface_children;
 	int times_focused_consecutively = 0;
 	bool pilot_preview_enabled = false;
 
@@ -568,6 +570,8 @@ public:
 	Control *get_surface() { return surface; }
 
 	bool is_2d_preview_enabled() const { return previewing_2d; }
+
+	void set_immersive_mode(bool p_enter);
 
 	Node3DEditorViewport(Node3DEditor *p_spatial_editor, int p_index);
 	~Node3DEditorViewport();
@@ -831,6 +835,7 @@ private:
 	PanelContainer *context_toolbar_panel = nullptr;
 	HBoxContainer *context_toolbar_hbox = nullptr;
 	HashMap<Control *, VSeparator *> context_toolbar_separators;
+	MarginContainer *toolbar_margin = nullptr;
 
 	void _update_context_toolbar();
 
@@ -1080,6 +1085,8 @@ public:
 		}
 		return false;
 	}
+
+	void set_immersive_mode(bool p_enter);
 
 	void set_freelook_viewport(Node3DEditorViewport *p_viewport) { freelook_viewport = p_viewport; }
 	Node3DEditorViewport *get_freelook_viewport() const { return freelook_viewport; }
