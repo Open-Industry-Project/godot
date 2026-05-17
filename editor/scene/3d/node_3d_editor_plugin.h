@@ -495,7 +495,7 @@ private:
 
 	CollisionResult _get_instance_position_and_normal(const Point2 &p_pos, Node3D *p_node) const;
 	Vector3 _get_instance_position(const Point2 &p_pos, Node3D *p_node) const;
-	static AABB _calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level = false, const Transform3D *p_bounds_orientation = nullptr);
+	static AABB _calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level = false, const Transform3D *p_bounds_orientation = nullptr, bool p_include_collision_geometry = true);
 
 	Node *_sanitize_preview_node(Node *p_node) const;
 

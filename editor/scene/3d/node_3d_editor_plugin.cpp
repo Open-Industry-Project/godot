@@ -96,6 +96,7 @@
 #include "scene/3d/decal.h"
 #include "scene/3d/light_3d.h"
 #include "scene/3d/mesh_instance_3d.h"
+#include "scene/3d/physics/collision_polygon_3d.h"
 #include "scene/3d/physics/collision_shape_3d.h"
 #include "scene/3d/physics/physics_body_3d.h"
 #include "scene/3d/physics/rigid_body_3d.h"
@@ -3782,7 +3783,7 @@ void Node3DEditorViewport::_notification(int p_what) {
 				if (!t.is_finite()) {
 					continue;
 				}
-				AABB new_aabb = _calculate_spatial_bounds(sp);
+				AABB new_aabb = _calculate_spatial_bounds(sp, false, nullptr, false);
 
 				exist = true;
 				if (se->last_xform == t && se->aabb == new_aabb && !se->last_xform_dirty) {
@@ -5950,6 +5951,11 @@ void _insert_rid_recursive(Node *node, HashSet<RID> &rids) {
 
 	if (co) {
 		rids.insert(co->get_rid());
+	} else if (Object::cast_to<CollisionShape3D>(node) || Object::cast_to<CollisionPolygon3D>(node)) {
+		CollisionObject3D *parent_co = Object::cast_to<CollisionObject3D>(node->get_parent());
+		if (parent_co) {
+			rids.insert(parent_co->get_rid());
+		}
 	} else if (node->is_class("CSGShape3D")) { // HACK: We should avoid referencing module logic.
 		rids.insert(node->call("_get_root_collision_instance"));
 	}
@@ -6097,7 +6103,7 @@ Node3DEditorViewport::CollisionResult Node3DEditorViewport::_get_instance_positi
 	return result;
 }
 
-AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level, const Transform3D *p_bounds_orientation) {
+AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level, const Transform3D *p_bounds_orientation, bool p_include_collision_geometry) {
 	if (!p_parent) {
 		return AABB(Vector3(-0.2, -0.2, -0.2), Vector3(0.4, 0.4, 0.4));
 	}
@@ -6119,15 +6125,30 @@ AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, boo
 	const VisualInstance3D *visual_instance = Object::cast_to<VisualInstance3D>(p_parent);
 	if (visual_instance) {
 		bounds = visual_instance->get_aabb();
-	} else {
-		bounds = AABB();
+	} else if (p_include_collision_geometry) {
+		if (const CollisionShape3D *col_shape = Object::cast_to<CollisionShape3D>(p_parent)) {
+			const Ref<Shape3D> shape = col_shape->get_shape();
+			if (shape.is_valid()) {
+				bounds = shape->get_debug_mesh()->get_aabb();
+			}
+		} else if (const CollisionPolygon3D *col_polygon = Object::cast_to<CollisionPolygon3D>(p_parent)) {
+			const Vector<Point2> polygon = col_polygon->get_polygon();
+			if (!polygon.is_empty()) {
+				const real_t half_depth = col_polygon->get_depth() * 0.5;
+				bounds = AABB(Vector3(polygon[0].x, polygon[0].y, half_depth), Vector3());
+				for (int i = 0; i < polygon.size(); i++) {
+					bounds.expand_to(Vector3(polygon[i].x, polygon[i].y, half_depth));
+					bounds.expand_to(Vector3(polygon[i].x, polygon[i].y, -half_depth));
+				}
+			}
+		}
 	}
 	bounds = xform_to_top_level_parent_space.xform(bounds);
 
 	for (int i = 0; i < p_parent->get_child_count(); i++) {
 		const Node3D *child = Object::cast_to<Node3D>(p_parent->get_child(i));
 		if (child && !(p_omit_top_level && child->is_set_as_top_level())) {
-			const AABB child_bounds = _calculate_spatial_bounds(child, p_omit_top_level, &bounds_orientation);
+			const AABB child_bounds = _calculate_spatial_bounds(child, p_omit_top_level, &bounds_orientation, p_include_collision_geometry);
 			bounds.merge_with(child_bounds);
 		}
 	}
