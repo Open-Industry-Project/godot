@@ -101,6 +101,7 @@ bool GridMap::_set(const StringName &p_name, const Variant &p_value) {
 			bm.instance = RS::get_singleton()->instance_create();
 			RS::get_singleton()->instance_set_base(bm.instance, bm.mesh->get_rid());
 			RS::get_singleton()->instance_attach_object_instance_id(bm.instance, get_instance_id());
+			RS::get_singleton()->instance_set_layer_mask(bm.instance, render_layers);
 			if (is_inside_tree()) {
 				RS::get_singleton()->instance_set_scenario(bm.instance, scenario);
 				RS::get_singleton()->instance_set_transform(bm.instance, get_global_transform());
@@ -842,6 +843,7 @@ bool GridMap::_octant_update(const OctantKey &p_key) {
 
 			RSE::ShadowCastingSetting cast_shadows = (RSE::ShadowCastingSetting)mesh_library->get_item_mesh_cast_shadow(E.key);
 			RS::get_singleton()->instance_geometry_set_cast_shadows_setting(instance, cast_shadows);
+			RS::get_singleton()->instance_set_layer_mask(instance, render_layers);
 
 			mmi.multimesh = mm;
 			mmi.instance = instance;
@@ -1255,6 +1257,9 @@ void GridMap::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("set_cell_scale", "scale"), &GridMap::set_cell_scale);
 	ClassDB::bind_method(D_METHOD("get_cell_scale"), &GridMap::get_cell_scale);
 
+	ClassDB::bind_method(D_METHOD("set_render_layers", "layers"), &GridMap::set_render_layers);
+	ClassDB::bind_method(D_METHOD("get_render_layers"), &GridMap::get_render_layers);
+
 	ClassDB::bind_method(D_METHOD("set_octant_size", "size"), &GridMap::set_octant_size);
 	ClassDB::bind_method(D_METHOD("get_octant_size"), &GridMap::get_octant_size);
 
@@ -1313,6 +1318,7 @@ void GridMap::_bind_methods() {
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "cell_center_y"), "set_center_y", "get_center_y");
 	ADD_PROPERTY(PropertyInfo(Variant::BOOL, "cell_center_z"), "set_center_z", "get_center_z");
 	ADD_PROPERTY(PropertyInfo(Variant::FLOAT, "cell_scale"), "set_cell_scale", "get_cell_scale");
+	ADD_PROPERTY(PropertyInfo(Variant::INT, "render_layers", PROPERTY_HINT_LAYERS_3D_RENDER), "set_render_layers", "get_render_layers");
 #ifndef PHYSICS_3D_DISABLED
 	ADD_GROUP("Collision", "collision_");
 	ADD_PROPERTY(PropertyInfo(Variant::INT, "collision_layer", PROPERTY_HINT_LAYERS_3D_PHYSICS), "set_collision_layer", "get_collision_layer");
@@ -1340,6 +1346,29 @@ void GridMap::set_cell_scale(float p_scale) {
 
 float GridMap::get_cell_scale() const {
 	return cell_scale;
+}
+
+void GridMap::set_render_layers(uint32_t p_layers) {
+	if (render_layers == p_layers) {
+		return;
+	}
+	render_layers = p_layers;
+	_update_visual_layers();
+}
+
+uint32_t GridMap::get_render_layers() const {
+	return render_layers;
+}
+
+void GridMap::_update_visual_layers() {
+	for (const KeyValue<OctantKey, Octant *> &E : octant_map) {
+		for (const Octant::MultimeshInstance &mmi : E.value->multimesh_instances) {
+			RS::get_singleton()->instance_set_layer_mask(mmi.instance, render_layers);
+		}
+	}
+	for (const BakedMesh &bm : baked_meshes) {
+		RS::get_singleton()->instance_set_layer_mask(bm.instance, render_layers);
+	}
 }
 
 TypedArray<Vector3i> GridMap::get_used_cells() const {
@@ -1674,6 +1703,7 @@ void GridMap::make_baked_meshes(bool p_gen_lightmap_uv, float p_lightmap_uv_texe
 		bm.instance = RS::get_singleton()->instance_create();
 		RS::get_singleton()->instance_set_base(bm.instance, bm.mesh->get_rid());
 		RS::get_singleton()->instance_attach_object_instance_id(bm.instance, get_instance_id());
+		RS::get_singleton()->instance_set_layer_mask(bm.instance, render_layers);
 		if (is_inside_tree()) {
 			RS::get_singleton()->instance_set_scenario(bm.instance, get_world_3d()->get_scenario());
 			RS::get_singleton()->instance_set_transform(bm.instance, get_global_transform());

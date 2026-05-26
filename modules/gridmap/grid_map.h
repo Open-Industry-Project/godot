@@ -178,6 +178,7 @@ class GridMap : public Node3D {
 	bool center_y = true;
 	bool center_z = true;
 	float cell_scale = 1.0;
+	uint32_t render_layers = 1;
 
 	bool recreating_octants = false;
 
@@ -187,6 +188,7 @@ class GridMap : public Node3D {
 	HashMap<IndexKey, Cell, IndexKey> cell_map;
 
 	void _recreate_octant_data();
+	void _update_visual_layers();
 
 	struct BakeLight {
 		RSE::LightType type = RSE::LightType::LIGHT_DIRECTIONAL;
@@ -308,6 +310,9 @@ public:
 
 	void set_cell_scale(float p_scale);
 	float get_cell_scale() const;
+
+	void set_render_layers(uint32_t p_layers);
+	uint32_t get_render_layers() const;
 
 	TypedArray<Vector3i> get_used_cells() const;
 	TypedArray<Vector3i> get_used_cells_by_item(int p_item) const;

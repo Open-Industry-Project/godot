@@ -274,6 +274,9 @@
 		<member name="physics_material" type="PhysicsMaterial" setter="set_physics_material" getter="get_physics_material">
 			Overrides the default friction and bounce physics properties for the whole [GridMap].
 		</member>
+		<member name="render_layers" type="int" setter="set_render_layers" getter="get_render_layers" default="1">
+			The render layers ([member VisualInstance3D.layers]) assigned to every cell's visual instance. Combined with a [Light3D]'s [member Light3D.light_cull_mask] and [member Light3D.shadow_caster_mask], this lets a light light or cast shadows from this GridMap's cells independently of other geometry.
+		</member>
 	</members>
 	<signals>
 		<signal name="cell_size_changed">
