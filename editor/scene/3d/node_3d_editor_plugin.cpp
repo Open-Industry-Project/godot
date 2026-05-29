@@ -8481,9 +8481,14 @@ void Node3DEditor::set_state(const Dictionary &p_state) {
 			if (!gizmo_plugins_by_name[j]->can_be_hidden()) {
 				continue;
 			}
+			const String gizmo_name = gizmo_plugins_by_name[j]->get_gizmo_name();
+			if (gizmo_name == "CollisionShape3D" || gizmo_name == "Light3D") {
+				gizmo_plugins_by_name.write[j]->set_state(EditorNode3DGizmoPlugin::HIDDEN);
+				continue;
+			}
 			int state = EditorNode3DGizmoPlugin::VISIBLE;
 			for (const KeyValue<Variant, Variant> &kv : gizmos_status) {
-				if (gizmo_plugins_by_name.write[j]->get_gizmo_name() == String(kv.key)) {
+				if (gizmo_name == String(kv.key)) {
 					state = kv.value;
 					break;
 				}
@@ -10925,6 +10930,14 @@ void Node3DEditor::_register_all_gizmos() {
 	add_gizmo_plugin(Ref<FogVolumeGizmoPlugin>(memnew(FogVolumeGizmoPlugin)));
 	add_gizmo_plugin(Ref<TwoBoneIK3DGizmoPlugin>(memnew(TwoBoneIK3DGizmoPlugin)));
 	add_gizmo_plugin(Ref<ChainIK3DGizmoPlugin>(memnew(ChainIK3DGizmoPlugin)));
+
+	for (int i = 0; i < gizmo_plugins_by_name.size(); ++i) {
+		const String gizmo_name = gizmo_plugins_by_name[i]->get_gizmo_name();
+		if (gizmo_name == "CollisionShape3D" || gizmo_name == "Light3D") {
+			gizmo_plugins_by_name.write[i]->set_state(EditorNode3DGizmoPlugin::HIDDEN);
+		}
+	}
+	_update_gizmos_menu();
 }
 
 void Node3DEditor::_bind_methods() {
