@@ -880,6 +880,7 @@ private:
 
 	void _selection_changed();
 	void _refresh_menu_icons();
+	void _undo_redo_history_changed();
 
 	bool do_snap_selected_nodes_to_floor = false;
 	void _snap_selected_nodes_to_floor();

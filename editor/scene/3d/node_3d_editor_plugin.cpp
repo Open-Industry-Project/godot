@@ -910,6 +910,15 @@ static bool _node_has_snap_target(Node *p_node, bool p_use_collision) {
 	return false;
 }
 
+static void _refresh_collision_snap_bvh(Node *p_node) {
+	if (CollisionShape3D *cs = Object::cast_to<CollisionShape3D>(p_node)) {
+		cs->update_gizmos();
+	}
+	for (int i = 0; i < p_node->get_child_count(); i++) {
+		_refresh_collision_snap_bvh(p_node->get_child(i));
+	}
+}
+
 bool Node3DEditorViewport::_find_closest_vertex_on_node(const Point2 &p_screen_pos, Node3D *p_node, float &r_closest_screen_dist, Vector3 &r_vertex_world) const {
 	bool found = false;
 	bool use_collision = Node3DEditor::get_singleton()->is_vertex_snap_use_collision();
@@ -9922,6 +9931,12 @@ void Node3DEditor::update_grid() {
 	}
 }
 
+void Node3DEditor::_undo_redo_history_changed() {
+	for (Node *node : editor_selection->get_top_selected_node_list()) {
+		_refresh_collision_snap_bvh(node);
+	}
+}
+
 void Node3DEditor::_selection_changed() {
 	_refresh_menu_icons();
 
@@ -10435,6 +10450,9 @@ void Node3DEditor::_notification(int p_what) {
 			get_tree()->connect("node_added", callable_mp(this, &Node3DEditor::_node_added));
 			SceneTreeDock::get_singleton()->get_tree_editor()->connect("node_changed", callable_mp(this, &Node3DEditor::_refresh_menu_icons));
 			editor_selection->connect("selection_changed", callable_mp(this, &Node3DEditor::_selection_changed));
+			EditorUndoRedoManager *undo_redo = EditorUndoRedoManager::get_singleton();
+			undo_redo->connect("history_changed", callable_mp(this, &Node3DEditor::_undo_redo_history_changed));
+			undo_redo->connect("version_changed", callable_mp(this, &Node3DEditor::_undo_redo_history_changed));
 
 			_update_preview_environment();
 
