@@ -714,6 +714,15 @@ void Node3DEditorViewport::_clear_selected() {
 	Node3DEditorSelectedItem *se = selected ? editor_selection->get_node_editor_data<Node3DEditorSelectedItem>(selected) : nullptr;
 
 	if (se && se->gizmo.is_valid()) {
+		if (!se->subgizmos.is_empty()) {
+			Vector<int> ids;
+			Vector<Transform3D> restore;
+			for (const KeyValue<int, Transform3D> &GE : se->subgizmos) {
+				ids.push_back(GE.key);
+				restore.push_back(GE.value);
+			}
+			se->gizmo->commit_subgizmos(ids, restore, true);
+		}
 		se->subgizmos.clear();
 		se->gizmo->redraw();
 		se->gizmo.unref();
