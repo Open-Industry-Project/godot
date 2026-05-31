@@ -231,6 +231,11 @@ bool JoltContactListener3D::_try_add_contacts(const JPH::Body &p_jolt_body1, con
 	JPH::CollisionEstimationResult collision;
 	JPH::EstimateCollisionResponse(p_jolt_body1, p_jolt_body2, p_manifold, collision, p_settings.mCombinedFriction, p_settings.mCombinedRestitution, JoltProjectSettings::bounce_velocity_threshold, 5);
 
+	float total_contact_impulse = 0.0f;
+	for (JPH::uint j = 0; j < contact_count; ++j) {
+		total_contact_impulse += collision.mContactImpulse[j];
+	}
+
 	for (JPH::uint i = 0; i < contact_count; ++i) {
 		const JPH::RVec3 relative_point1 = JPH::RVec3(p_manifold.mRelativeContactPointsOn1[i]);
 		const JPH::RVec3 relative_point2 = JPH::RVec3(p_manifold.mRelativeContactPointsOn2[i]);
@@ -241,11 +246,11 @@ bool JoltContactListener3D::_try_add_contacts(const JPH::Body &p_jolt_body1, con
 		const JPH::Vec3 velocity1 = p_jolt_body1.GetPointVelocity(world_point1);
 		const JPH::Vec3 velocity2 = p_jolt_body2.GetPointVelocity(world_point2);
 
-		const JPH::CollisionEstimationResult::Impulse &impulse = collision.mImpulses[i];
-
-		const JPH::Vec3 contact_impulse = p_manifold.mWorldSpaceNormal * impulse.mContactImpulse;
-		const JPH::Vec3 friction_impulse1 = collision.mTangent1 * impulse.mFrictionImpulse1;
-		const JPH::Vec3 friction_impulse2 = collision.mTangent2 * impulse.mFrictionImpulse2;
+		const float ci = collision.mContactImpulse[i];
+		const float weight = total_contact_impulse > 0.0f ? ci / total_contact_impulse : 1.0f / contact_count;
+		const JPH::Vec3 contact_impulse = p_manifold.mWorldSpaceNormal * ci;
+		const JPH::Vec3 friction_impulse1 = collision.mTangent1 * collision.mFrictionImpulse1 * weight;
+		const JPH::Vec3 friction_impulse2 = collision.mTangent2 * collision.mFrictionImpulse2 * weight;
 		const JPH::Vec3 combined_impulse = contact_impulse + friction_impulse1 + friction_impulse2;
 
 		Contact contact1;

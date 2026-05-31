@@ -114,6 +114,8 @@ thirdparty_sources = [
     "Jolt/Physics/Constraints/SwingTwistConstraint.cpp",
     "Jolt/Physics/Constraints/TwoBodyConstraint.cpp",
     "Jolt/Physics/Ragdoll/Ragdoll.cpp",
+    "Jolt/Compute/ComputeSystem.cpp",
+    "Jolt/Physics/Hair/HairSettings.cpp",
     "Jolt/Physics/SoftBody/SoftBodyCreationSettings.cpp",
     "Jolt/Physics/SoftBody/SoftBodyMotionProperties.cpp",
     "Jolt/Physics/SoftBody/SoftBodyShape.cpp",
