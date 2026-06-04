@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  editor_simulation_run_bar.h                                           */
+/*  simulation.cpp                                                        */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -28,37 +28,50 @@
 /* SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.                 */
 /**************************************************************************/
 
-#pragma once
+#include "simulation.h"
 
-#include "scene/gui/panel_container.h"
+#include "core/object/class_db.h"
 
-class Button;
-class HBoxContainer;
+Simulation *Simulation::singleton = nullptr;
 
-class EditorSimulationRunBar : public PanelContainer {
-	GDCLASS(EditorSimulationRunBar, PanelContainer);
+void Simulation::_bind_methods() {
+	ClassDB::bind_method(D_METHOD("start"), &Simulation::start);
+	ClassDB::bind_method(D_METHOD("stop"), &Simulation::stop);
+	ClassDB::bind_method(D_METHOD("toggle_pause"), &Simulation::toggle_pause);
+	ClassDB::bind_method(D_METHOD("is_running"), &Simulation::is_running);
+	ClassDB::bind_method(D_METHOD("is_paused"), &Simulation::is_paused);
 
-	Button *play_button = nullptr;
-	Button *pause_button = nullptr;
-	Button *stop_button = nullptr;
-	HBoxContainer *hbox = nullptr;
+	ADD_SIGNAL(MethodInfo("started"));
+	ADD_SIGNAL(MethodInfo("stopped"));
+	ADD_SIGNAL(MethodInfo("pause_toggled", PropertyInfo(Variant::BOOL, "paused")));
+}
 
-	void _on_play_pressed();
-	void _on_pause_toggled(bool p_pressed);
-	void _on_stop_pressed();
-	void _update_shortcut_tooltips();
+void Simulation::start() {
+	if (running) {
+		return;
+	}
+	running = true;
+	paused = false;
+	emit_signal(SNAME("started"));
+}
 
-	void _on_simulation_started();
-	void _on_simulation_stopped();
-	void _on_simulation_pause_toggled(bool p_paused);
+void Simulation::stop() {
+	if (!running) {
+		return;
+	}
+	running = false;
+	paused = false;
+	emit_signal(SNAME("stopped"));
+}
 
-protected:
-	void _notification(int p_what);
-	static void _bind_methods();
+void Simulation::toggle_pause() {
+	if (!running) {
+		return;
+	}
+	paused = !paused;
+	emit_signal(SNAME("pause_toggled"), paused);
+}
 
-public:
-	void enable_buttons();
-	void disable_buttons();
-
-	EditorSimulationRunBar();
-};
+Simulation::Simulation() {
+	singleton = this;
+}

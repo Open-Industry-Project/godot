@@ -123,6 +123,9 @@ private:
 
 	bool node_threading_disabled = false;
 
+	void _on_simulation_started();
+	void _on_simulation_stopped();
+
 #ifndef _3D_DISABLED
 	struct ClientPhysicsInterpolation {
 		SelfList<Node3D>::List _node_3d_list;

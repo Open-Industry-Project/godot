@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<class name="Simulation" inherits="Object" api_type="core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="../class.xsd">
+	<brief_description>
+		A singleton that tracks the running state of the simulation.
+	</brief_description>
+	<description>
+		The Simulation singleton holds the lifecycle state of the simulation independently of the context it runs in. The editor drives it through the simulation run bar while editing, and it is equally available at runtime, so the same nodes can react to [signal started], [signal stopped], and [signal pause_toggled] whether the scene is simulated in the editor or launched as a game.
+			While a simulation is running, [SceneTree] keeps the 2D and 3D physics servers active, and deactivates them when it stops, so physics-driven nodes only simulate during a run in both contexts.
+	</description>
+	<tutorials>
+	</tutorials>
+	<methods>
+		<method name="is_paused" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the simulation is running but currently paused.
+			</description>
+		</method>
+		<method name="is_running" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] if the simulation is currently running.
+			</description>
+		</method>
+		<method name="start">
+			<return type="void" />
+			<description>
+				Starts the simulation and emits [signal started]. Does nothing if the simulation is already running.
+			</description>
+		</method>
+		<method name="stop">
+			<return type="void" />
+			<description>
+				Stops the simulation and emits [signal stopped]. Does nothing if the simulation is not running.
+			</description>
+		</method>
+		<method name="toggle_pause">
+			<return type="void" />
+			<description>
+				Toggles the paused state of the simulation and emits [signal pause_toggled]. Does nothing if the simulation is not running.
+			</description>
+		</method>
+	</methods>
+	<signals>
+		<signal name="pause_toggled">
+			<param index="0" name="paused" type="bool" />
+			<description>
+				Emitted when the simulation's paused state is toggled. [param paused] is the new paused state.
+			</description>
+		</signal>
+		<signal name="started">
+			<description>
+				Emitted when the simulation starts.
+			</description>
+		</signal>
+		<signal name="stopped">
+			<description>
+				Emitted when the simulation stops.
+			</description>
+		</signal>
+	</signals>
+</class>

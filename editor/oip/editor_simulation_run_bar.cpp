@@ -31,13 +31,13 @@
 #include "editor_simulation_run_bar.h"
 
 #include "core/object/callable_mp.h"
+#include "core/simulation.h"
 #include "editor/editor_interface.h"
 #include "editor/editor_node.h"
 #include "editor/editor_string_names.h"
 #include "editor/settings/editor_settings.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/button.h"
-#include "servers/physics_3d/physics_server_3d.h"
 
 void EditorSimulationRunBar::_notification(int p_what) {
 	switch (p_what) {
@@ -53,21 +53,18 @@ void EditorSimulationRunBar::_notification(int p_what) {
 }
 
 void EditorSimulationRunBar::_bind_methods() {
-	ADD_SIGNAL(MethodInfo("simulation_started"));
-	ADD_SIGNAL(MethodInfo("simulation_stopped"));
-	ADD_SIGNAL(MethodInfo("simulation_pause_toggled", PropertyInfo(Variant::BOOL, "paused")));
 }
 
 void EditorSimulationRunBar::_on_play_pressed() {
-	start_simulation();
+	Simulation::get_singleton()->start();
 }
 
 void EditorSimulationRunBar::_on_pause_toggled(bool p_pressed) {
-	toggle_pause_simulation();
+	Simulation::get_singleton()->toggle_pause();
 }
 
 void EditorSimulationRunBar::_on_stop_pressed() {
-	stop_simulation();
+	Simulation::get_singleton()->stop();
 }
 
 void EditorSimulationRunBar::_update_shortcut_tooltips() {
@@ -94,49 +91,39 @@ void EditorSimulationRunBar::_update_shortcut_tooltips() {
 	}
 }
 
-void EditorSimulationRunBar::start_simulation() {
-	simulation_running = true;
-	simulation_paused = false;
+void EditorSimulationRunBar::_on_simulation_started() {
 	pause_button->set_pressed_no_signal(false);
 	play_button->set_disabled(true);
 	pause_button->set_disabled(false);
 	stop_button->set_disabled(false);
 
-	PhysicsServer3D::get_singleton()->set_active(true);
 	EditorNode::get_singleton()->set_simulation_started(true);
-	emit_signal(SNAME("simulation_started"));
 }
 
-void EditorSimulationRunBar::stop_simulation() {
-	simulation_running = false;
-	simulation_paused = false;
+void EditorSimulationRunBar::_on_simulation_stopped() {
 	pause_button->set_pressed_no_signal(false);
 	play_button->set_disabled(false);
 	pause_button->set_disabled(true);
 	stop_button->set_disabled(true);
 
-	PhysicsServer3D::get_singleton()->set_active(false);
 	Node *edited_scene = EditorNode::get_singleton()->get_edited_scene();
 	if (edited_scene) {
 		edited_scene->set_process_mode(Node::PROCESS_MODE_INHERIT);
 	}
 	EditorNode::get_singleton()->set_simulation_started(false);
-	emit_signal(SNAME("simulation_stopped"));
 }
 
-void EditorSimulationRunBar::toggle_pause_simulation() {
-	simulation_paused = !simulation_paused;
+void EditorSimulationRunBar::_on_simulation_pause_toggled(bool p_paused) {
+	pause_button->set_pressed_no_signal(p_paused);
 
 	Node *edited_scene = EditorNode::get_singleton()->get_edited_scene();
 	if (edited_scene) {
-		edited_scene->set_process_mode(simulation_paused ? Node::PROCESS_MODE_DISABLED : Node::PROCESS_MODE_INHERIT);
+		edited_scene->set_process_mode(p_paused ? Node::PROCESS_MODE_DISABLED : Node::PROCESS_MODE_INHERIT);
 	}
-
-	emit_signal(SNAME("simulation_pause_toggled"), simulation_paused);
 }
 
 void EditorSimulationRunBar::enable_buttons() {
-	if (simulation_running) {
+	if (Simulation::get_singleton()->is_running()) {
 		play_button->set_disabled(true);
 		pause_button->set_disabled(false);
 		stop_button->set_disabled(false);
@@ -178,6 +165,11 @@ EditorSimulationRunBar::EditorSimulationRunBar() {
 	stop_button->set_disabled(true);
 	stop_button->connect(SceneStringName(pressed), callable_mp(this, &EditorSimulationRunBar::_on_stop_pressed));
 	hbox->add_child(stop_button);
+
+	Simulation *simulation = Simulation::get_singleton();
+	simulation->connect(SNAME("started"), callable_mp(this, &EditorSimulationRunBar::_on_simulation_started));
+	simulation->connect(SNAME("stopped"), callable_mp(this, &EditorSimulationRunBar::_on_simulation_stopped));
+	simulation->connect(SNAME("pause_toggled"), callable_mp(this, &EditorSimulationRunBar::_on_simulation_pause_toggled));
 
 	Ref<Shortcut> start_shortcut;
 	start_shortcut.instantiate();

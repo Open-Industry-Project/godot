@@ -1,5 +1,5 @@
 /**************************************************************************/
-/*  editor_simulation_run_bar.h                                           */
+/*  simulation.h                                                          */
 /**************************************************************************/
 /*                         This file is part of:                          */
 /*                             GODOT ENGINE                               */
@@ -30,35 +30,28 @@
 
 #pragma once
 
-#include "scene/gui/panel_container.h"
+#include "core/object/object.h"
 
-class Button;
-class HBoxContainer;
+class Simulation : public Object {
+	GDCLASS(Simulation, Object);
 
-class EditorSimulationRunBar : public PanelContainer {
-	GDCLASS(EditorSimulationRunBar, PanelContainer);
+	static Simulation *singleton;
 
-	Button *play_button = nullptr;
-	Button *pause_button = nullptr;
-	Button *stop_button = nullptr;
-	HBoxContainer *hbox = nullptr;
-
-	void _on_play_pressed();
-	void _on_pause_toggled(bool p_pressed);
-	void _on_stop_pressed();
-	void _update_shortcut_tooltips();
-
-	void _on_simulation_started();
-	void _on_simulation_stopped();
-	void _on_simulation_pause_toggled(bool p_paused);
+	bool running = false;
+	bool paused = false;
 
 protected:
-	void _notification(int p_what);
 	static void _bind_methods();
 
 public:
-	void enable_buttons();
-	void disable_buttons();
+	static Simulation *get_singleton() { return singleton; }
 
-	EditorSimulationRunBar();
+	void start();
+	void stop();
+	void toggle_pause();
+
+	bool is_running() const { return running; }
+	bool is_paused() const { return paused; }
+
+	Simulation();
 };

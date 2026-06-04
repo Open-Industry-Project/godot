@@ -46,6 +46,7 @@
 #include "core/os/keyboard.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "core/simulation.h"
 #include "core/string/print_string.h"
 #include "core/string/translation_server.h"
 #include "core/version.h"
@@ -462,11 +463,11 @@ void EditorNode::shortcut_input(const Ref<InputEvent> &p_event) {
 		} else if (ED_IS_SHORTCUT("editor/save_all_scenes", p_event)) {
 			_menu_option(SCENE_SAVE_ALL_SCENES);
 		} else if (ED_IS_SHORTCUT("Open Industry Project/Start Simulation", p_event)) {
-			EditorInterface::get_singleton()->start_simulation();
+			Simulation::get_singleton()->start();
 		} else if (ED_IS_SHORTCUT("Open Industry Project/Toggle Pause Simulation", p_event)) {
-			EditorInterface::get_singleton()->toggle_pause_simulation();
+			Simulation::get_singleton()->toggle_pause();
 		} else if (ED_IS_SHORTCUT("Open Industry Project/Stop Simulation", p_event)) {
-			EditorInterface::get_singleton()->stop_simulation();
+			Simulation::get_singleton()->stop();
 		} else if (ED_IS_SHORTCUT("editor/toggle_last_opened_bottom_panel", p_event)) {
 			bottom_panel->toggle_last_opened_bottom_panel();
 		} else if (ED_IS_SHORTCUT("editor/toggle_selected_nodes_visibility", p_event)) {
@@ -4790,8 +4791,8 @@ void EditorNode::_set_current_scene(int p_idx) {
 }
 
 void EditorNode::_set_current_scene_nocheck(int p_idx, bool p_ignore_state) {
-	if (oip_mode_active && simulation_run_bar && simulation_run_bar->is_simulation_running()) {
-		simulation_run_bar->stop_simulation();
+	if (oip_mode_active && Simulation::get_singleton()->is_running()) {
+		Simulation::get_singleton()->stop();
 	}
 
 	// Save the folding in case the scene gets reloaded.
@@ -8297,8 +8298,8 @@ void EditorNode::_exit_oip_mode() {
 		return;
 	}
 
-	if (simulation_run_bar && simulation_run_bar->is_simulation_running()) {
-		simulation_run_bar->stop_simulation();
+	if (Simulation::get_singleton()->is_running()) {
+		Simulation::get_singleton()->stop();
 	}
 
 	oip_mode_active = false;
@@ -9514,10 +9515,6 @@ EditorNode::EditorNode() {
 	title_bar->add_child(simulation_run_bar);
 	title_bar->move_child(simulation_run_bar, main_editor_button_hb->get_index() + 1);
 	title_bar->set_center_control(simulation_run_bar);
-
-	simulation_run_bar->connect(SNAME("simulation_started"), callable_mp(EditorInterface::get_singleton(), &EditorInterface::_on_simulation_started));
-	simulation_run_bar->connect(SNAME("simulation_stopped"), callable_mp(EditorInterface::get_singleton(), &EditorInterface::_on_simulation_stopped));
-	simulation_run_bar->connect(SNAME("simulation_pause_toggled"), callable_mp(EditorInterface::get_singleton(), &EditorInterface::_on_simulation_pause_toggled));
 
 	main_editor_button_hb->set_visible(false);
 	project_run_bar->set_visible(false);

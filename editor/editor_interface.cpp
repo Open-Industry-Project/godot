@@ -48,7 +48,6 @@
 #include "editor/inspector/editor_preview_plugins.h"
 #include "editor/inspector/editor_resource_preview.h"
 #include "editor/inspector/property_selector.h"
-#include "editor/oip/editor_simulation_run_bar.h"
 #include "editor/run/editor_run_bar.h"
 #include "editor/scene/3d/node_3d_editor_plugin.h"
 #include "editor/scene/editor_scene_tabs.h"
@@ -449,52 +448,6 @@ Node3D *EditorInterface::get_active_node_3d() const {
 
 void EditorInterface::set_main_screen_editor(const String &p_name) {
 	EditorNode::get_singleton()->get_editor_main_screen()->select_by_name(p_name);
-}
-
-void EditorInterface::set_simulation_started(bool p_started) {
-	EditorNode::get_singleton()->set_simulation_started(p_started);
-}
-
-void EditorInterface::start_simulation() {
-	EditorSimulationRunBar *run_bar = EditorNode::get_singleton()->get_simulation_run_bar();
-	ERR_FAIL_NULL(run_bar);
-	run_bar->start_simulation();
-}
-
-void EditorInterface::stop_simulation() {
-	EditorSimulationRunBar *run_bar = EditorNode::get_singleton()->get_simulation_run_bar();
-	ERR_FAIL_NULL(run_bar);
-	run_bar->stop_simulation();
-}
-
-void EditorInterface::toggle_pause_simulation() {
-	EditorSimulationRunBar *run_bar = EditorNode::get_singleton()->get_simulation_run_bar();
-	ERR_FAIL_NULL(run_bar);
-	run_bar->toggle_pause_simulation();
-}
-
-bool EditorInterface::is_simulation_running() const {
-	EditorSimulationRunBar *run_bar = EditorNode::get_singleton()->get_simulation_run_bar();
-	ERR_FAIL_NULL_V(run_bar, false);
-	return run_bar->is_simulation_running();
-}
-
-bool EditorInterface::is_simulation_paused() const {
-	EditorSimulationRunBar *run_bar = EditorNode::get_singleton()->get_simulation_run_bar();
-	ERR_FAIL_NULL_V(run_bar, false);
-	return run_bar->is_simulation_paused();
-}
-
-void EditorInterface::_on_simulation_started() {
-	emit_signal(SNAME("simulation_started"));
-}
-
-void EditorInterface::_on_simulation_stopped() {
-	emit_signal(SNAME("simulation_stopped"));
-}
-
-void EditorInterface::_on_simulation_pause_toggled(bool p_paused) {
-	emit_signal(SNAME("simulation_pause_toggled"), p_paused);
 }
 
 void EditorInterface::set_distraction_free_mode(bool p_enter) {
@@ -941,12 +894,6 @@ void EditorInterface::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_active_node_3d"), &EditorInterface::get_active_node_3d);
 
 	ClassDB::bind_method(D_METHOD("set_main_screen_editor", "name"), &EditorInterface::set_main_screen_editor);
-	ClassDB::bind_method(D_METHOD("set_simulation_started", "started"), &EditorInterface::set_simulation_started);
-	ClassDB::bind_method(D_METHOD("start_simulation"), &EditorInterface::start_simulation);
-	ClassDB::bind_method(D_METHOD("stop_simulation"), &EditorInterface::stop_simulation);
-	ClassDB::bind_method(D_METHOD("toggle_pause_simulation"), &EditorInterface::toggle_pause_simulation);
-	ClassDB::bind_method(D_METHOD("is_simulation_running"), &EditorInterface::is_simulation_running);
-	ClassDB::bind_method(D_METHOD("is_simulation_paused"), &EditorInterface::is_simulation_paused);
 	ClassDB::bind_method(D_METHOD("set_distraction_free_mode", "enter"), &EditorInterface::set_distraction_free_mode);
 	ClassDB::bind_method(D_METHOD("is_distraction_free_mode_enabled"), &EditorInterface::is_distraction_free_mode_enabled);
 	ClassDB::bind_method(D_METHOD("is_multi_window_enabled"), &EditorInterface::is_multi_window_enabled);
@@ -1032,10 +979,6 @@ void EditorInterface::_bind_methods() {
 
 	ADD_SIGNAL(MethodInfo("transform_requested"));
 	ADD_SIGNAL(MethodInfo("transform_commited"));
-
-	ADD_SIGNAL(MethodInfo("simulation_started"));
-	ADD_SIGNAL(MethodInfo("simulation_stopped"));
-	ADD_SIGNAL(MethodInfo("simulation_pause_toggled", PropertyInfo(Variant::BOOL, "paused")));
 }
 
 void EditorInterface::create() {

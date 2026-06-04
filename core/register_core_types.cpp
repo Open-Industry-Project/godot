@@ -85,6 +85,7 @@
 #include "core/os/main_loop.h"
 #include "core/os/os.h"
 #include "core/os/time.h"
+#include "core/simulation.h"
 #include "core/string/optimized_translation.h"
 #include "core/string/translation.h"
 #include "core/string/translation_server.h"
@@ -114,6 +115,7 @@ static CoreBind::EngineDebugger *_engine_debugger = nullptr;
 
 static IP *ip = nullptr;
 static Time *_time = nullptr;
+static Simulation *_simulation = nullptr;
 
 static CoreBind::Geometry2D *_geometry_2d = nullptr;
 static CoreBind::Geometry3D *_geometry_3d = nullptr;
@@ -149,6 +151,9 @@ void register_core_types() {
 
 	GDREGISTER_CLASS(Time);
 	_time = memnew(Time);
+
+	GDREGISTER_CLASS(Simulation);
+	_simulation = memnew(Simulation);
 	ResourceLoader::initialize();
 
 	Variant::register_types();
@@ -366,6 +371,7 @@ void register_early_core_singletons() {
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ProjectSettings", ProjectSettings::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("OS", CoreBind::OS::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("Time", Time::get_singleton()));
+	Engine::get_singleton()->add_singleton(Engine::Singleton("Simulation", Simulation::get_singleton()));
 	Engine::get_singleton()->add_singleton(Engine::Singleton("ClassDB", _classdb));
 }
 
@@ -484,6 +490,7 @@ void unregister_core_types() {
 	ResourceLoader::finalize();
 
 	ClassDB::cleanup_defaults();
+	memdelete(_simulation);
 	memdelete(_time);
 	ObjectDB::cleanup();
 

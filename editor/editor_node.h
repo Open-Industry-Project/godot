@@ -841,7 +841,6 @@ public:
 	ProjectSettingsEditor *get_project_settings() { return project_settings_editor; }
 
 	void set_simulation_started(bool p_started) { simulation_started = p_started; }
-	EditorSimulationRunBar *get_simulation_run_bar() const { return simulation_run_bar; }
 
 	void trigger_menu_option(int p_option, bool p_confirmed);
 	bool has_previous_closed_scenes() const;

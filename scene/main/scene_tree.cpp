@@ -42,6 +42,7 @@ STATIC_ASSERT_INCOMPLETE_TYPE(class, RenderingServer);
 #include "core/object/worker_thread_pool.h"
 #include "core/os/os.h"
 #include "core/profiling/profiling.h"
+#include "core/simulation.h"
 #include "scene/animation/tween.h"
 #include "scene/debugger/scene_debugger.h"
 #include "scene/gui/control.h"
@@ -1148,6 +1149,24 @@ bool SceneTree::is_paused() const {
 	return paused;
 }
 
+void SceneTree::_on_simulation_started() {
+#ifndef PHYSICS_3D_DISABLED
+	PhysicsServer3D::get_singleton()->set_active(true);
+#endif // PHYSICS_3D_DISABLED
+#ifndef PHYSICS_2D_DISABLED
+	PhysicsServer2D::get_singleton()->set_active(true);
+#endif // PHYSICS_2D_DISABLED
+}
+
+void SceneTree::_on_simulation_stopped() {
+#ifndef PHYSICS_3D_DISABLED
+	PhysicsServer3D::get_singleton()->set_active(false);
+#endif // PHYSICS_3D_DISABLED
+#ifndef PHYSICS_2D_DISABLED
+	PhysicsServer2D::get_singleton()->set_active(false);
+#endif // PHYSICS_2D_DISABLED
+}
+
 void SceneTree::set_suspend(bool p_enabled) {
 	ERR_FAIL_COND_MSG(!Thread::is_main_thread(), "Suspend can only be set from the main thread.");
 
@@ -2101,6 +2120,11 @@ SceneTree::SceneTree() {
 
 	root->set_as_audio_listener_2d(true);
 	current_scene = nullptr;
+
+	if (Simulation::get_singleton()) {
+		Simulation::get_singleton()->connect(SNAME("started"), callable_mp(this, &SceneTree::_on_simulation_started));
+		Simulation::get_singleton()->connect(SNAME("stopped"), callable_mp(this, &SceneTree::_on_simulation_stopped));
+	}
 
 	const int msaa_mode_2d = GLOBAL_GET("rendering/anti_aliasing/quality/msaa_2d");
 	root->set_msaa_2d(Viewport::MSAA(msaa_mode_2d));
