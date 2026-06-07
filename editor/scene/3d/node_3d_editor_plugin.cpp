@@ -6497,8 +6497,12 @@ void Node3DEditorViewport::update_transform(bool p_shift) {
 			Vector3 global_axis;
 			switch (_edit.plane) {
 				case TRANSFORM_VIEW:
-					local_axis = _edit.view_axis_local;
 					global_axis = _get_camera_normal();
+					local_axis = _edit.view_axis_local;
+					if (local_axis.is_zero_approx()) {
+						local_axis = spatial_editor->get_gizmo_transform().basis.xform_inv(global_axis).normalized();
+						_edit.view_axis_local = local_axis;
+					}
 					break;
 				case TRANSFORM_X_AXIS:
 					local_axis = Vector3(1, 0, 0);
