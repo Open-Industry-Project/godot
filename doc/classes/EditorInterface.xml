@@ -299,6 +299,18 @@
 				Returns [code]true[/code] if the specified [param plugin] is enabled. The plugin name is the same as its directory name.
 			</description>
 		</method>
+		<method name="is_transforming" qualifiers="const">
+			<return type="bool" />
+			<description>
+				Returns [code]true[/code] while a transform operation (gizmo drag, instant transform, or gizmo handle drag) is in progress in any 3D editor viewport.
+			</description>
+		</method>
+		<method name="keep_transform_freeze">
+			<return type="void" />
+			<description>
+				Keeps [RigidBody3D] nodes that were temporarily frozen by the in-progress transform operation frozen after the transform finishes, instead of restoring their unfrozen state.
+			</description>
+		</method>
 		<method name="make_mesh_previews">
 			<return type="Texture2D[]" />
 			<param index="0" name="meshes" type="Mesh[]" />

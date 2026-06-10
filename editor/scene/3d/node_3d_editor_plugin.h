@@ -215,7 +215,7 @@ private:
 	Label *ruler_label_y = nullptr;
 	Label *ruler_label_z = nullptr;
 
-	bool freeze = false;
+	Vector<ObjectID> transform_frozen_bodies;
 
 	int index;
 	void _menu_option(int p_option);
@@ -570,6 +570,9 @@ public:
 	Control *get_surface() { return surface; }
 
 	bool is_2d_preview_enabled() const { return previewing_2d; }
+
+	bool is_transforming() const { return _edit.mode != TRANSFORM_NONE || _edit.gizmo.is_valid(); }
+	void keep_transform_freeze() { transform_frozen_bodies.clear(); }
 
 	void set_immersive_mode(bool p_enter);
 
@@ -1085,6 +1088,23 @@ public:
 			}
 		}
 		return false;
+	}
+
+	bool is_transforming() const {
+		for (unsigned int i = 0; i < VIEWPORTS_COUNT; i++) {
+			if (viewports[i] && viewports[i]->is_transforming()) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	void keep_transform_freeze() {
+		for (unsigned int i = 0; i < VIEWPORTS_COUNT; i++) {
+			if (viewports[i]) {
+				viewports[i]->keep_transform_freeze();
+			}
+		}
 	}
 
 	void set_immersive_mode(bool p_enter);

@@ -446,6 +446,14 @@ Node3D *EditorInterface::get_active_node_3d() const {
 	return Node3DEditor::get_singleton()->get_active_node();
 }
 
+bool EditorInterface::is_transforming() const {
+	return Node3DEditor::get_singleton()->is_transforming();
+}
+
+void EditorInterface::keep_transform_freeze() {
+	Node3DEditor::get_singleton()->keep_transform_freeze();
+}
+
 void EditorInterface::set_main_screen_editor(const String &p_name) {
 	EditorNode::get_singleton()->get_editor_main_screen()->select_by_name(p_name);
 }
@@ -892,6 +900,8 @@ void EditorInterface::_bind_methods() {
 	ClassDB::bind_method(D_METHOD("get_editor_viewport_2d"), &EditorInterface::get_editor_viewport_2d);
 	ClassDB::bind_method(D_METHOD("get_editor_viewport_3d", "idx"), &EditorInterface::get_editor_viewport_3d, DEFVAL(0));
 	ClassDB::bind_method(D_METHOD("get_active_node_3d"), &EditorInterface::get_active_node_3d);
+	ClassDB::bind_method(D_METHOD("is_transforming"), &EditorInterface::is_transforming);
+	ClassDB::bind_method(D_METHOD("keep_transform_freeze"), &EditorInterface::keep_transform_freeze);
 
 	ClassDB::bind_method(D_METHOD("set_main_screen_editor", "name"), &EditorInterface::set_main_screen_editor);
 	ClassDB::bind_method(D_METHOD("set_distraction_free_mode", "enter"), &EditorInterface::set_distraction_free_mode);
