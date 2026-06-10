@@ -8243,6 +8243,16 @@ void EditorNode::_oip_scene_changed() {
 	}
 }
 
+void EditorNode::set_simulation_started(bool p_started) {
+	simulation_started = p_started;
+
+	if (p_started) {
+		OS::get_singleton()->set_low_processor_usage_mode(false);
+	} else {
+		_update_update_spinner();
+	}
+}
+
 void EditorNode::_enter_oip_mode() {
 	if (oip_mode_active) {
 		return;
@@ -8289,8 +8299,6 @@ void EditorNode::_enter_oip_mode() {
 	} else {
 		simulation_run_bar->disable_buttons();
 	}
-
-	EditorSettings::get_singleton()->set_setting("interface/editor/update_continuously", true);
 }
 
 void EditorNode::_exit_oip_mode() {
