@@ -12024,6 +12024,31 @@ bool Node3DEditor::is_vertex_snap_use_collision() const {
 	return vertex_snap_use_collision != Input::get_singleton()->is_key_pressed(Key::SHIFT);
 }
 
+void Node3DEditor::begin_inspector_transform(Node3D *p_node) {
+	if (inspector_transforming) {
+		return;
+	}
+	inspector_transforming = true;
+	for (int i = 0; i < p_node->get_child_count(); i++) {
+		RigidBody3D *rb = Object::cast_to<RigidBody3D>(p_node->get_child(i));
+		if (rb && !rb->is_freeze_enabled()) {
+			rb->set_freeze_enabled(true);
+			inspector_frozen_bodies.push_back(rb->get_instance_id());
+		}
+	}
+}
+
+void Node3DEditor::end_inspector_transform() {
+	inspector_transforming = false;
+	for (const ObjectID &id : inspector_frozen_bodies) {
+		RigidBody3D *rb = ObjectDB::get_instance<RigidBody3D>(id);
+		if (rb) {
+			rb->set_freeze_enabled(false);
+		}
+	}
+	inspector_frozen_bodies.clear();
+}
+
 real_t Node3DEditor::get_translate_snap() const {
 	real_t snap_value = snap_translate_value;
 	if (Input::get_singleton()->is_key_pressed(Key::SHIFT)) {

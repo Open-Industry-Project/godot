@@ -53,6 +53,10 @@ class EditorPropertyVectorN : public EditorProperty {
 	void _update_ratio();
 	void _store_link(bool p_linked);
 	void _value_changed(double p_val, const String &p_name);
+	bool _is_node_3d_transform_property();
+	void _transform_edit_begin();
+	void _transform_edit_end();
+	void _transform_edit_committed();
 
 protected:
 	virtual void _set_read_only(bool p_read_only) override;

@@ -33,8 +33,10 @@
 #include "core/object/callable_mp.h"
 #include "editor/editor_string_names.h"
 #include "editor/gui/editor_spin_slider.h"
+#include "editor/scene/3d/node_3d_editor_plugin.h"
 #include "editor/settings/editor_settings.h"
 #include "editor/themes/editor_scale.h"
+#include "scene/3d/node_3d.h"
 #include "scene/gui/box_container.h"
 #include "scene/gui/texture_button.h"
 
@@ -43,6 +45,35 @@ const String EditorPropertyVectorN::COMPONENT_LABELS[4] = { "x", "y", "z", "w" }
 void EditorPropertyVectorN::_set_read_only(bool p_read_only) {
 	for (EditorSpinSlider *spin : spin_sliders) {
 		spin->set_read_only(p_read_only);
+	}
+}
+
+bool EditorPropertyVectorN::_is_node_3d_transform_property() {
+	if (!Object::cast_to<Node3D>(get_edited_object())) {
+		return false;
+	}
+	const StringName &prop = get_edited_property();
+	return prop == SNAME("position") || prop == SNAME("rotation") || prop == SNAME("scale");
+}
+
+void EditorPropertyVectorN::_transform_edit_begin() {
+	if (_is_node_3d_transform_property() && Node3DEditor::get_singleton()) {
+		Node3DEditor::get_singleton()->begin_inspector_transform(Object::cast_to<Node3D>(get_edited_object()));
+	}
+}
+
+void EditorPropertyVectorN::_transform_edit_end() {
+	if (Node3DEditor::get_singleton()) {
+		Node3DEditor::get_singleton()->end_inspector_transform();
+	}
+}
+
+void EditorPropertyVectorN::_transform_edit_committed() {
+	if (_is_node_3d_transform_property()) {
+		Object *obj = get_edited_object();
+		if (obj->has_method("_inspector_transform_committed")) {
+			obj->call("_inspector_transform_committed");
+		}
 	}
 }
 
@@ -69,6 +100,14 @@ void EditorPropertyVectorN::_value_changed(double val, const String &p_name) {
 		}
 	}
 
+	bool grabbing = false;
+	for (EditorSpinSlider *spin : spin_sliders) {
+		grabbing = grabbing || spin->is_grabbing();
+	}
+	if (grabbing) {
+		_transform_edit_begin();
+	}
+
 	Variant v;
 	Callable::CallError cerror;
 	Variant::construct(vector_type, v, nullptr, 0, cerror);
@@ -81,6 +120,10 @@ void EditorPropertyVectorN::_value_changed(double val, const String &p_name) {
 		}
 	}
 	emit_changed(get_edited_property(), v, linked->is_pressed() ? "" : p_name);
+
+	if (!grabbing) {
+		_transform_edit_committed();
+	}
 }
 
 void EditorPropertyVectorN::update_property() {
@@ -119,6 +162,10 @@ void EditorPropertyVectorN::_store_link(bool p_linked) {
 
 void EditorPropertyVectorN::_notification(int p_what) {
 	switch (p_what) {
+		case NOTIFICATION_EXIT_TREE: {
+			_transform_edit_end();
+		} break;
+
 		case NOTIFICATION_READY: {
 			if (linked->is_visible()) {
 				if (get_edited_object()) {
@@ -220,6 +267,7 @@ EditorPropertyVectorN::EditorPropertyVectorN(Variant::Type p_type, bool p_force_
 			spin[i]->set_h_size_flags(SIZE_EXPAND_FILL);
 		}
 		spin[i]->connect(SceneStringName(value_changed), callable_mp(this, &EditorPropertyVectorN::_value_changed).bind(String(COMPONENT_LABELS[i])));
+		spin[i]->connect("ungrabbed", callable_mp(this, &EditorPropertyVectorN::_transform_edit_end));
 		add_focusable(spin[i]);
 	}
 

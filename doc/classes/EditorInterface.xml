@@ -302,7 +302,7 @@
 		<method name="is_transforming" qualifiers="const">
 			<return type="bool" />
 			<description>
-				Returns [code]true[/code] while a transform operation (gizmo drag, instant transform, or gizmo handle drag) is in progress in any 3D editor viewport.
+				Returns [code]true[/code] while a transform operation (gizmo drag, instant transform, or gizmo handle drag) is in progress in any 3D editor viewport, or while a transform property of a [Node3D] is being dragged in the inspector.
 			</description>
 		</method>
 		<method name="keep_transform_freeze">

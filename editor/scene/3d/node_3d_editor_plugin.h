@@ -972,6 +972,9 @@ private:
 
 	void _undo_redo_inspector_callback(Object *p_undo_redo, Object *p_edited, const String &p_property, const Variant &p_new_value);
 
+	bool inspector_transforming = false;
+	Vector<ObjectID> inspector_frozen_bodies;
+
 protected:
 	void _notification(int p_what);
 	//void _gui_input(InputEvent p_event);
@@ -1091,6 +1094,9 @@ public:
 	}
 
 	bool is_transforming() const {
+		if (inspector_transforming) {
+			return true;
+		}
 		for (unsigned int i = 0; i < VIEWPORTS_COUNT; i++) {
 			if (viewports[i] && viewports[i]->is_transforming()) {
 				return true;
@@ -1100,12 +1106,16 @@ public:
 	}
 
 	void keep_transform_freeze() {
+		inspector_frozen_bodies.clear();
 		for (unsigned int i = 0; i < VIEWPORTS_COUNT; i++) {
 			if (viewports[i]) {
 				viewports[i]->keep_transform_freeze();
 			}
 		}
 	}
+
+	void begin_inspector_transform(Node3D *p_node);
+	void end_inspector_transform();
 
 	void set_immersive_mode(bool p_enter);
 
