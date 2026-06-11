@@ -59,6 +59,7 @@ class EditorNode3DGizmo : public Node3DGizmo {
 	Vector<Vector3> collision_segments;
 	LocalVector<Ref<TriangleMesh>> collision_meshes;
 	bool collision_meshes_are_snap_source = false;
+	AABB collision_local_aabb;
 
 	Vector<Vector3> handles;
 	Vector<int> handle_ids;

@@ -72,6 +72,7 @@ void EditorNode3DGizmo::clear() {
 	collision_segments.clear();
 	collision_meshes.clear();
 	collision_meshes_are_snap_source = false;
+	collision_local_aabb = AABB();
 	instances.clear();
 	handles.clear();
 	handle_ids.clear();
@@ -259,21 +260,7 @@ void EditorNode3DGizmo::_update_bvh() {
 	Vector3 icon_size_vector3 = Vector3(effective_icon_size, effective_icon_size, effective_icon_size);
 	AABB aabb(transform.origin - icon_size_vector3 * 100.0f, icon_size_vector3 * 200.0f);
 
-	for (const Vector3 &segment_end : collision_segments) {
-		aabb.expand_to(transform.xform(segment_end));
-	}
-
-	if (!collision_meshes.is_empty()) {
-		for (Ref<TriangleMesh> collision_mesh : collision_meshes) {
-			if (collision_mesh.is_valid()) {
-				for (const Face3 &face : collision_mesh->get_faces()) {
-					aabb.expand_to(transform.xform(face.vertex[0]));
-					aabb.expand_to(transform.xform(face.vertex[1]));
-					aabb.expand_to(transform.xform(face.vertex[2]));
-				}
-			}
-		}
-	}
+	aabb.merge_with(transform.xform(collision_local_aabb));
 
 	Node3DEditor::get_singleton()->update_gizmo_bvh_node(
 			bvh_node_id,
@@ -385,6 +372,12 @@ void EditorNode3DGizmo::add_unscaled_billboard(const Ref<Material> &p_material, 
 
 void EditorNode3DGizmo::add_collision_triangles(const Ref<TriangleMesh> &p_tmesh) {
 	collision_meshes.push_back(p_tmesh);
+
+	if (p_tmesh.is_valid()) {
+		for (const Vector3 &vertex : p_tmesh->get_vertices()) {
+			collision_local_aabb.expand_to(vertex);
+		}
+	}
 }
 
 void EditorNode3DGizmo::add_collision_segments(const Vector<Vector3> &p_lines) {
@@ -392,6 +385,7 @@ void EditorNode3DGizmo::add_collision_segments(const Vector<Vector3> &p_lines) {
 	collision_segments.resize(from + p_lines.size());
 	for (int i = 0; i < p_lines.size(); i++) {
 		collision_segments.write[from + i] = p_lines[i];
+		collision_local_aabb.expand_to(p_lines[i]);
 	}
 }
 
