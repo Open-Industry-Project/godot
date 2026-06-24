@@ -8747,8 +8747,8 @@ void Node3DEditor::_find_geometry_instances_recursive(Node *p_node, List<Geometr
 		r_list.push_back(geom_instance);
 	}
 
-	for (int i = 0; i < p_node->get_child_count(); i++) {
-		_find_geometry_instances_recursive(p_node->get_child(i), r_list);
+	for (int i = 0; i < p_node->get_child_count(true); i++) {
+		_find_geometry_instances_recursive(p_node->get_child(i, true), r_list);
 	}
 }
 
@@ -8763,6 +8763,9 @@ void Node3DEditor::update_selected_item_aabb(Node3D *p_node) {
 	}
 	AABB new_aabb = Node3DEditorViewport::_calculate_spatial_bounds(p_node);
 	se->aabb = new_aabb;
+	if (outline_enabled && outline_active && editor_selection->get_selection().has(p_node->get_instance_id())) {
+		_create_outline_instances(p_node, p_node == active_node);
+	}
 	Transform3D t_offset = t;
 	{
 		const Vector3 offset(0.005, 0.005, 0.005);
