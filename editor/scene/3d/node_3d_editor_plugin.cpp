@@ -8130,7 +8130,11 @@ void Node3DEditor::update_transform_gizmo() {
 			if (!xf.is_finite()) {
 				continue;
 			}
-			gizmo_center += xf.origin;
+			Vector3 node_origin = xf.origin;
+			if (sp->has_method("_get_editor_gizmo_pivot_offset")) {
+				node_origin += xf.basis.xform((Vector3)sp->call("_get_editor_gizmo_pivot_offset"));
+			}
+			gizmo_center += node_origin;
 			if (count == selection.size() - 1 && local_gizmo_coords) {
 				gizmo_basis = xf.basis;
 			}
