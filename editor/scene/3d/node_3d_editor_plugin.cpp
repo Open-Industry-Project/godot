@@ -4205,6 +4205,16 @@ void Node3DEditorViewport::_notification(int p_what) {
 				preview_basis.rotate(Vector3(0, 1, 0), preview_node_angle);
 
 				CollisionResult cr = _get_instance_position_and_normal(preview_node_viewport_pos, preview_node);
+				if (!cr.has_collision) {
+					Vector3 vis_point;
+					Vector3 vis_normal;
+					if (_rest_preview_on_visual_mesh(preview_node_viewport_pos, preview_node, vis_point, vis_normal)) {
+						cr.has_collision = true;
+						cr.surface_point = vis_point;
+						cr.position = vis_point;
+						cr.normal = vis_normal;
+					}
+				}
 				Vector3 surface_pos = spatial_editor->snap_point(cr.has_collision ? cr.surface_point : cr.position);
 				Vector3 offset_pos = spatial_editor->snap_point(cr.position);
 
@@ -6125,6 +6135,77 @@ Node3DEditorViewport::CollisionResult Node3DEditorViewport::_get_instance_positi
 	result.position = world_pos + world_ray * FALLBACK_DISTANCE;
 	result.normal = -world_ray.normalized();
 	return result;
+}
+
+bool Node3DEditorViewport::_rest_preview_on_visual_mesh(const Point2 &p_screen_pos, Node3D *p_exclude, Vector3 &r_point, Vector3 &r_normal) {
+	const Vector3 ray_from = get_ray_pos(p_screen_pos);
+	const Vector3 ray_dir = get_ray(p_screen_pos);
+
+	// Candidate nodes whose gizmo BVH overlaps a few-pixel box around the cursor.
+	const real_t pad = 6.0;
+	const Point2 min_pos(p_screen_pos.x - pad, p_screen_pos.y - pad);
+	const Point2 max_pos(p_screen_pos.x + pad, p_screen_pos.y + pad);
+	Vector<Node3D *> nodes = Node3DEditor::get_singleton()->gizmo_bvh_frustum_query(_build_screen_frustum(min_pos, max_pos));
+
+	real_t best_dist = 1e20;
+	bool found = false;
+	for (Node3D *spat : nodes) {
+		if (!spat) {
+			continue;
+		}
+		// Skip the preview ghost (and its descendants) so it never rests on itself.
+		if (p_exclude) {
+			bool skip = false;
+			for (Node *cur = spat; cur; cur = cur->get_parent()) {
+				if (cur == p_exclude) {
+					skip = true;
+					break;
+				}
+			}
+			if (skip) {
+				continue;
+			}
+		}
+
+		const Transform3D gt = spat->get_global_transform();
+		if (!gt.is_finite()) {
+			continue;
+		}
+		const Transform3D inv = gt.affine_inverse();
+		const Vector3 local_from = inv.xform(ray_from);
+		const Vector3 local_dir = inv.basis.xform(ray_dir).normalized();
+		if (local_dir.is_zero_approx()) {
+			continue;
+		}
+
+		Vector<Ref<Node3DGizmo>> gizmos = spat->get_gizmos();
+		for (int i = 0; i < gizmos.size(); i++) {
+			Ref<EditorNode3DGizmo> gizmo = gizmos[i];
+			if (gizmo.is_null()) {
+				continue;
+			}
+			const LocalVector<Ref<TriangleMesh>> &meshes = gizmo->get_collision_meshes();
+			for (const Ref<TriangleMesh> &tm : meshes) {
+				if (tm.is_null() || !tm->is_valid()) {
+					continue;
+				}
+				Vector3 local_point;
+				Vector3 local_normal;
+				if (!tm->intersect_ray(local_from, local_dir, local_point, local_normal)) {
+					continue;
+				}
+				const Vector3 world_point = gt.xform(local_point);
+				const real_t dist = ray_from.distance_to(world_point);
+				if (dist < best_dist) {
+					best_dist = dist;
+					r_point = world_point;
+					r_normal = gt.basis.xform(local_normal).normalized();
+					found = true;
+				}
+			}
+		}
+	}
+	return found;
 }
 
 AABB Node3DEditorViewport::_calculate_spatial_bounds(const Node3D *p_parent, bool p_omit_top_level, const Transform3D *p_bounds_orientation) {
