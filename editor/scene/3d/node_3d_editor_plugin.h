@@ -326,6 +326,7 @@ private:
 
 	Transform3D _get_camera_transform() const;
 	int get_selected_count() const;
+	int _rotation_lock_mask() const;
 	void cancel_transform();
 	void _update_shrink();
 
@@ -713,6 +714,9 @@ private:
 	Vector3 grid_camera_last_update_position;
 
 	Ref<ArrayMesh> move_gizmo[3], move_plane_gizmo[3], rotate_gizmo[4], scale_gizmo[3], scale_plane_gizmo[3], axis_gizmo[3];
+	Ref<ArrayMesh> rotate_gizmo_full[3];
+	Ref<StandardMaterial3D> rotate_gizmo_full_color[3];
+	Ref<StandardMaterial3D> rotate_gizmo_full_hl[3];
 	Ref<ArrayMesh> trackball_sphere_gizmo;
 	Ref<StandardMaterial3D> gizmo_color[3];
 	Ref<StandardMaterial3D> plane_gizmo_color[3];
@@ -1056,6 +1060,7 @@ public:
 	Ref<ArrayMesh> get_axis_gizmo(int idx) const { return axis_gizmo[idx]; }
 	Ref<ArrayMesh> get_move_plane_gizmo(int idx) const { return move_plane_gizmo[idx]; }
 	Ref<ArrayMesh> get_rotate_gizmo(int idx) const { return rotate_gizmo[idx]; }
+	Ref<ArrayMesh> get_rotate_gizmo_full(int idx) const { return rotate_gizmo_full[idx]; }
 	Ref<ArrayMesh> get_scale_gizmo(int idx) const { return scale_gizmo[idx]; }
 	Ref<ArrayMesh> get_scale_plane_gizmo(int idx) const { return scale_plane_gizmo[idx]; }
 	Ref<ArrayMesh> get_trackball_sphere_gizmo() const { return trackball_sphere_gizmo; }

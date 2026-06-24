@@ -609,6 +609,21 @@ int Node3DEditorViewport::get_selected_count() const {
 	return count;
 }
 
+int Node3DEditorViewport::_rotation_lock_mask() const {
+	int mask = 0;
+	const HashMap<ObjectID, Object *> &selection = editor_selection->get_selection();
+	for (const KeyValue<ObjectID, Object *> &E : selection) {
+		Node3D *sp = ObjectDB::get_instance<Node3D>(E.key);
+		if (!sp) {
+			continue;
+		}
+		if (sp->has_method("_get_editor_rotation_lock")) {
+			mask |= (int)sp->call("_get_editor_rotation_lock");
+		}
+	}
+	return mask;
+}
+
 void Node3DEditorViewport::cancel_transform() {
 	const List<Node *> &selection = editor_selection->get_top_selected_node_list();
 
@@ -1651,6 +1666,7 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 	}
 
 	if (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_TRANSFORM || spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_ROTATE) {
+		const int lock_mask = _rotation_lock_mask();
 		int col_axis = -1;
 		bool view_rotation_selected = false;
 		bool trackball_selected = false;
@@ -1693,6 +1709,10 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 			}
 		}
 
+		if (col_axis != -1 && (lock_mask & (1 << col_axis))) {
+			col_axis = -1;
+		}
+
 		if (col_axis == -1) {
 			Vector3 ray_to_center = gt.origin - ray_pos;
 			real_t ray_length_to_center = ray_to_center.dot(ray);
@@ -1708,6 +1728,11 @@ bool Node3DEditorViewport::_transform_gizmo_select(const Vector2 &p_screenpos, b
 			} else if (spatial_editor->is_trackball_enabled() && distance_ray_to_center < gizmo_scale * (GIZMO_CIRCLE_SIZE - GIZMO_RING_HALF_WIDTH) && ray_length_to_center > 0) {
 				trackball_selected = true;
 			}
+		}
+
+		if (lock_mask != 0) {
+			view_rotation_selected = false;
+			trackball_selected = false;
 		}
 
 		if (view_rotation_selected) {
@@ -5654,6 +5679,21 @@ void Node3DEditorViewport::update_transform_gizmo_view() {
 
 	bool show_gizmo = spatial_editor->is_gizmo_visible() && !_edit.instant && transform_gizmo_visible && !collision_reposition && !hide_gizmo_during_rotation && !hide_gizmo_during_trackball;
 	bool show_rotate_gizmo = show_gizmo && (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_TRANSFORM || spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_ROTATE);
+	const int rotation_lock_mask = _rotation_lock_mask();
+	int full_ring_axis = -1;
+	{
+		int unlocked_count = 0;
+		int unlocked_axis = -1;
+		for (int i = 0; i < 3; i++) {
+			if (!(rotation_lock_mask & (1 << i))) {
+				unlocked_count++;
+				unlocked_axis = i;
+			}
+		}
+		if (rotation_lock_mask != 0 && unlocked_count == 1) {
+			full_ring_axis = unlocked_axis;
+		}
+	}
 
 	for (int i = 0; i < 3; i++) {
 		Transform3D axis_angle;
@@ -5667,7 +5707,9 @@ void Node3DEditorViewport::update_transform_gizmo_view() {
 		RenderingServer::get_singleton()->instance_set_transform(move_plane_gizmo_instance[i], axis_angle);
 		RenderingServer::get_singleton()->instance_set_visible(move_plane_gizmo_instance[i], show_gizmo && (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_TRANSFORM || spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_MOVE));
 		RenderingServer::get_singleton()->instance_set_transform(rotate_gizmo_instance[i], axis_angle);
-		RenderingServer::get_singleton()->instance_set_visible(rotate_gizmo_instance[i], show_rotate_gizmo && i != arc_replaces_ring);
+		const Ref<ArrayMesh> &ring_mesh = (i == full_ring_axis) ? spatial_editor->get_rotate_gizmo_full(i) : spatial_editor->get_rotate_gizmo(i);
+		RenderingServer::get_singleton()->instance_set_base(rotate_gizmo_instance[i], ring_mesh.is_valid() ? ring_mesh->get_rid() : RID());
+		RenderingServer::get_singleton()->instance_set_visible(rotate_gizmo_instance[i], show_rotate_gizmo && i != arc_replaces_ring && !(rotation_lock_mask & (1 << i)));
 		RenderingServer::get_singleton()->instance_set_transform(scale_gizmo_instance[i], axis_angle);
 		RenderingServer::get_singleton()->instance_set_visible(scale_gizmo_instance[i], show_gizmo && (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_SCALE));
 		RenderingServer::get_singleton()->instance_set_transform(scale_plane_gizmo_instance[i], axis_angle);
@@ -5679,7 +5721,7 @@ void Node3DEditorViewport::update_transform_gizmo_view() {
 	view_rotation_xform.orthonormalize();
 
 	bool can_show_trackball = spatial_editor->is_gizmo_visible() && !_edit.instant && transform_gizmo_visible && !collision_reposition && !hide_gizmo_during_rotation;
-	bool show_trackball_sphere = can_show_trackball && (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_TRANSFORM || spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_ROTATE) && !hide_gizmo_during_trackball;
+	bool show_trackball_sphere = can_show_trackball && (spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_TRANSFORM || spatial_editor->get_tool_mode() == Node3DEditor::TOOL_MODE_ROTATE) && !hide_gizmo_during_trackball && rotation_lock_mask == 0;
 	Transform3D trackball_xform = view_rotation_xform;
 	trackball_xform.basis.scale(scale);
 	RenderingServer::get_singleton()->instance_set_transform(trackball_sphere_instance, trackball_xform);
@@ -5689,7 +5731,7 @@ void Node3DEditorViewport::update_transform_gizmo_view() {
 	Vector3 view_ring_scale = shrink_view_ring ? scale : scale * (spatial_editor->gizmo_view_rotation_scale / GIZMO_CIRCLE_SIZE);
 	view_rotation_xform.basis.scale(view_ring_scale);
 	RenderingServer::get_singleton()->instance_set_transform(rotate_gizmo_instance[3], view_rotation_xform);
-	RenderingServer::get_singleton()->instance_set_visible(rotate_gizmo_instance[3], show_rotate_gizmo && arc_replaces_ring != 3);
+	RenderingServer::get_singleton()->instance_set_visible(rotate_gizmo_instance[3], show_rotate_gizmo && arc_replaces_ring != 3 && rotation_lock_mask == 0);
 
 	bool show_axes = spatial_editor->is_gizmo_visible() && _edit.mode != TRANSFORM_NONE && !hide_gizmo_during_trackball;
 	RenderingServer *rs = RenderingServer::get_singleton();
@@ -8163,6 +8205,9 @@ void Node3DEditor::select_gizmo_highlight_axis(int p_axis) {
 			highlight = (i + 3) == p_axis;
 		}
 		rotate_gizmo[i]->surface_set_material(0, highlight ? rotate_gizmo_color_hl[i] : rotate_gizmo_color[i]);
+		if (i < 3 && rotate_gizmo_full[i].is_valid()) {
+			rotate_gizmo_full[i]->surface_set_material(0, highlight ? rotate_gizmo_full_hl[i] : rotate_gizmo_full_color[i]);
+		}
 	}
 
 	bool highlight_trackball = (p_axis == GIZMO_HIGHLIGHT_AXIS_TRACKBALL);
@@ -10055,6 +10100,56 @@ void fragment() {
 				Ref<ShaderMaterial> rotate_mat_hl = rotate_mat->duplicate();
 				rotate_mat_hl->set_shader_parameter("albedo", albedo);
 				rotate_gizmo_color_hl[i] = rotate_mat_hl;
+
+				if (i < 3) {
+					Ref<SurfaceTool> full_st;
+					full_st.instantiate();
+					full_st->begin(Mesh::PRIMITIVE_TRIANGLES);
+					const int fn = 64; // circle segments
+					const int fm = 6; // tube segments (round cross-section)
+					const real_t minor_r = 0.02; // matches the stock ring's shader push
+					for (int j = 0; j < fn; ++j) {
+						Basis fb = Basis(ivec, (Math::TAU / fn) * j);
+						Vector3 center = fb.xform(ivec2 * GIZMO_CIRCLE_SIZE);
+						for (int k = 0; k < fm; ++k) {
+							Vector2 ofs = Vector2(Math::cos((Math::TAU * k) / fm), Math::sin((Math::TAU * k) / fm));
+							Vector3 nrm = fb.xform(ivec * ofs.x + ivec2 * ofs.y);
+							full_st->set_normal(nrm);
+							full_st->add_vertex(center + nrm * minor_r);
+						}
+					}
+					for (int j = 0; j < fn; ++j) {
+						for (int k = 0; k < fm; ++k) {
+							int cur = j * fm;
+							int nxt = ((j + 1) % fn) * fm;
+							int cs = k;
+							int ns = (k + 1) % fm;
+							full_st->add_index(cur + ns);
+							full_st->add_index(cur + cs);
+							full_st->add_index(nxt + cs);
+							full_st->add_index(nxt + cs);
+							full_st->add_index(nxt + ns);
+							full_st->add_index(cur + ns);
+						}
+					}
+					Ref<StandardMaterial3D> full_mat;
+					full_mat.instantiate();
+					full_mat->set_shading_mode(StandardMaterial3D::SHADING_MODE_UNSHADED);
+					full_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_FOG, true);
+					full_mat->set_flag(StandardMaterial3D::FLAG_DISABLE_DEPTH_TEST, true);
+					full_mat->set_render_priority(Material::RENDER_PRIORITY_MAX);
+					Color full_col = col;
+					full_col.a = 1.0;
+					full_mat->set_albedo(full_col);
+					rotate_gizmo_full_color[i] = full_mat;
+					Ref<StandardMaterial3D> full_mat_hl = full_mat->duplicate();
+					full_mat_hl->set_albedo(albedo);
+					rotate_gizmo_full_hl[i] = full_mat_hl;
+					rotate_gizmo_full[i].instantiate();
+					Array full_arrays = full_st->commit_to_arrays();
+					rotate_gizmo_full[i]->add_surface_from_arrays(Mesh::PRIMITIVE_TRIANGLES, full_arrays);
+					rotate_gizmo_full[i]->surface_set_material(0, full_mat);
+				}
 			}
 
 			// Only create scale gizmo for X, Y, Z axes (not view rotation).
